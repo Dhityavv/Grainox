@@ -19,6 +19,6 @@ frontend/dist/
 frontend/*.tsbuildinfo
 
 # Vercel & Environment
-.vercel/
+.vercel
 .env
-.env.*
+.env*
