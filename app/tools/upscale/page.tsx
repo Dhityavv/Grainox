@@ -21,12 +21,6 @@ import ToolAnalyticsBar from "@/components/analytics/ToolAnalyticsBar";
 import { runAiUpscale, type UpscaleProgress } from "@/lib/ai-upscaler";
 import { recordToolUsage } from "@/lib/stats-service";
 import { useLanguage } from "@/lib/i18n";
-import {
-  playDragHoverSound,
-  playDropSound,
-  playSuccessSound,
-  playClickSound,
-} from "@/lib/sound-effects";
 
 export default function UpscalePage() {
   const { t } = useLanguage();
@@ -81,7 +75,6 @@ export default function UpscalePage() {
 
   const handleProcessFile = (file: File) => {
     if (!file.type.startsWith("image/")) return;
-    playDropSound();
 
     setImageName(file.name);
     setImageSizeKb((file.size / 1024).toFixed(1));
@@ -145,7 +138,6 @@ export default function UpscalePage() {
         engine: res.method,
       });
       setHasResult(true);
-      playSuccessSound();
       recordToolUsage("upscale");
     } catch (err) {
       console.error("Upscale failed:", err);
@@ -216,7 +208,6 @@ export default function UpscalePage() {
           e.preventDefault();
           if (!isDragging) {
             setIsDragging(true);
-            playDragHoverSound();
           }
         }}
         onDragLeave={(e) => {
@@ -486,7 +477,6 @@ export default function UpscalePage() {
                     : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20"
                 }`}
                 onClick={() => {
-                  playSuccessSound();
                   setIsDownloaded(true);
                   const a = document.createElement("a");
                   a.href = downloadUrl;

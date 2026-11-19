@@ -26,7 +26,6 @@ import ShimmerButton from "@/components/ui/ShimmerButton";
 import BorderBeam from "@/components/ui/BorderBeam";
 import ToolAnalyticsBar from "@/components/analytics/ToolAnalyticsBar";
 import DropZone from "@/components/ui/DropZone";
-import { playSuccessSound } from "@/lib/sound-effects";
 import { recordToolUsage } from "@/lib/stats-service";
 import { useLanguage } from "@/lib/i18n";
 import {
@@ -112,7 +111,6 @@ export default function PdfToolsPage() {
   };
 
   const triggerDownload = (url: string, filename: string, downloadId: string) => {
-    playSuccessSound();
     setDownloadedSet((prev) => new Set(prev).add(downloadId));
     const a = document.createElement("a");
     a.href = url;

@@ -2,7 +2,6 @@
 
 import React, { useState, useRef } from "react";
 import { Upload, LucideIcon } from "lucide-react";
-import { playDragHoverSound, playDropSound, playClickSound } from "@/lib/sound-effects";
 
 interface DropZoneProps {
   id: string;
@@ -42,7 +41,6 @@ export default function DropZone({
     if (disabled) return;
     if (!isDragging) {
       setIsDragging(true);
-      playDragHoverSound();
     }
   };
 
@@ -61,7 +59,6 @@ export default function DropZone({
 
     const files = Array.from(e.dataTransfer.files || []);
     if (files.length > 0) {
-      playDropSound();
       onFilesSelected(multiple ? files : [files[0]]);
     }
   };
@@ -70,7 +67,6 @@ export default function DropZone({
     if (disabled) return;
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
-      playDropSound();
       onFilesSelected(multiple ? files : [files[0]]);
     }
     // Reset value so same file can be re-selected if needed
@@ -94,9 +90,6 @@ export default function DropZone({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => {
-          if (!disabled) playClickSound();
-        }}
         tabIndex={disabled ? -1 : 0}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {

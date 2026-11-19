@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Sparkles, Info, Menu, X, ArrowRightLeft, Download, Languages, FileText, Volume2, VolumeX } from "lucide-react";
+import { Sparkles, Info, Menu, X, ArrowRightLeft, Download, Languages, FileText } from "lucide-react";
 import GrainoxLogo from "@/components/ui/GrainoxLogo";
 import CleanLink from "@/components/ui/CleanLink";
 import { useLanguage } from "@/lib/i18n";
-import { isSoundEnabled, toggleSound, playClickSound } from "@/lib/sound-effects";
 
 interface NavbarProps {
   onOpenInfo?: () => void;
@@ -16,25 +15,9 @@ interface NavbarProps {
 export default function Navbar({ onOpenInfo }: NavbarProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [soundActive, setSoundActive] = useState(true);
   const { lang, toggleLang, t } = useLanguage();
 
-  useEffect(() => {
-    setSoundActive(isSoundEnabled());
-    const handleSoundToggle = (e: any) => {
-      setSoundActive(e.detail?.enabled ?? isSoundEnabled());
-    };
-    window.addEventListener("grainox_sound_toggled", handleSoundToggle);
-    return () => window.removeEventListener("grainox_sound_toggled", handleSoundToggle);
-  }, []);
-
-  const handleToggleSound = () => {
-    const next = toggleSound();
-    setSoundActive(next);
-  };
-
   const handleInstallApp = () => {
-    playClickSound();
     window.dispatchEvent(new CustomEvent("grainox_trigger_pwa_install"));
   };
 
@@ -115,26 +98,8 @@ export default function Navbar({ onOpenInfo }: NavbarProps) {
             </nav>
           </div>
 
-          {/* Right Actions: Sound Toggle, Install PWA, Language Toggle, Info Button & Mobile Hamburger */}
+          {/* Right Actions: Install PWA, Language Toggle, Info Button & Mobile Hamburger */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Audio Effects Toggle */}
-            <button
-              onClick={handleToggleSound}
-              className={`flex items-center justify-center w-8 h-8 rounded-lg border transition-all shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
-                soundActive
-                  ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
-                  : "border-white/10 bg-[#12151E] text-slate-500 hover:text-slate-300"
-              }`}
-              title={
-                soundActive
-                  ? lang === "en" ? "Mute interactive audio" : "Matikan efek suara interaktif"
-                  : lang === "en" ? "Enable interactive audio" : "Aktifkan efek suara interaktif"
-              }
-              aria-label="Toggle interactive audio sound effects"
-            >
-              {soundActive ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-            </button>
-
             {/* Install App Trigger */}
             <button
               onClick={handleInstallApp}
@@ -228,23 +193,6 @@ export default function Navbar({ onOpenInfo }: NavbarProps) {
                   </span>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
                     PWA
-                  </span>
-                </button>
-
-                <button
-                  onClick={handleToggleSound}
-                  className="flex items-center justify-between w-full px-4 py-3 text-sm font-semibold rounded-xl bg-white/[0.04] text-slate-200 hover:text-amber-400 hover:bg-white/[0.08] border border-white/5 transition-all"
-                >
-                  <span className="flex items-center gap-2.5">
-                    {soundActive ? (
-                      <Volume2 className="w-4 h-4 text-amber-400" />
-                    ) : (
-                      <VolumeX className="w-4 h-4 text-slate-500" />
-                    )}
-                    <span>{lang === "en" ? "Audio Effects" : "Efek Suara Interaktif"}</span>
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-white/[0.08] text-slate-300 border border-white/10">
-                    {soundActive ? (lang === "en" ? "ON 🔊" : "AKTIF 🔊") : (lang === "en" ? "MUTE 🔇" : "SENYAP 🔇")}
                   </span>
                 </button>
 

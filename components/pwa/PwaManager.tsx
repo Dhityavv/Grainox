@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Download, X, Sparkles } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
-import { playClickSound, playSuccessSound } from "@/lib/sound-effects";
 
 export default function PwaManager() {
   const { lang } = useLanguage();
@@ -46,9 +45,6 @@ export default function PwaManager() {
       if (deferredPrompt) {
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then((choice: any) => {
-          if (choice.outcome === "accepted") {
-            playSuccessSound();
-          }
           setDeferredPrompt(null);
           setShowBanner(false);
         });
@@ -71,19 +67,14 @@ export default function PwaManager() {
   }, [isEn, deferredPrompt]);
 
   const handleInstallClick = async () => {
-    playClickSound();
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      playSuccessSound();
-    }
     setDeferredPrompt(null);
     setShowBanner(false);
   };
 
   const handleDismissBanner = () => {
-    playClickSound();
     setShowBanner(false);
     // Dismiss for 7 days
     try {

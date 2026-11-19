@@ -25,7 +25,6 @@ import ToolAnalyticsBar from "@/components/analytics/ToolAnalyticsBar";
 import type { DownloaderResult, MediaDownloadItem } from "@/lib/downloader-engine";
 import { recordToolUsage } from "@/lib/stats-service";
 import { useLanguage } from "@/lib/i18n";
-import { playSuccessSound, playClickSound } from "@/lib/sound-effects";
 
 interface HistoryItem {
   id: string;
@@ -252,7 +251,6 @@ export default function DownloaderPage() {
       const blob = new Blob(chunks as any, { type: blobType });
       const blobUrl = URL.createObjectURL(blob);
 
-      playSuccessSound();
       const link = document.createElement("a");
       link.href = blobUrl;
       link.download = cleanFilename;
@@ -262,7 +260,6 @@ export default function DownloaderPage() {
       setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
     } catch {
       // Fallback directly to browser native download if stream reader fails
-      playSuccessSound();
       const link = document.createElement("a");
       link.href = streamUrl;
       link.download = cleanFilename;
