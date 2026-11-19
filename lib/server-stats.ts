@@ -161,6 +161,7 @@ export async function incrementPlatformStatsAsync(
     await put("stats.json", JSON.stringify(updated), {
       access: "public",
       addRandomSuffix: false,
+      allowOverwrite: true,
     });
   } catch (blobErr) {
     console.warn("Vercel Blob write error:", blobErr);
