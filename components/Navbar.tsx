@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Sparkles, Info, Menu, X, ArrowRightLeft, Download, Languages } from "lucide-react";
+import { Sparkles, Info, Menu, X, ArrowRightLeft, Download, Languages, FileText } from "lucide-react";
 import GrainoxLogo from "@/components/ui/GrainoxLogo";
 import CleanLink from "@/components/ui/CleanLink";
 import { useLanguage } from "@/lib/i18n";
@@ -43,6 +43,7 @@ export default function Navbar({ onOpenInfo }: NavbarProps) {
     { href: "/tools/upscale", label: t.nav.upscaler, icon: Sparkles },
     { href: "/tools/downloader", label: t.nav.downloader, icon: Download },
     { href: "/tools/converter", label: t.nav.converter, icon: ArrowRightLeft },
+    { href: "/tools/pdf", label: "PDF Tools", icon: FileText },
   ];
 
   const isActive = (href: string, exact?: boolean) => {

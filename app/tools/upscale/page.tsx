@@ -29,6 +29,7 @@ export default function UpscalePage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<UpscaleProgress | null>(null);
   const [hasResult, setHasResult] = useState(false);
+  const [isDownloaded, setIsDownloaded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   // Image states
@@ -78,6 +79,7 @@ export default function UpscalePage() {
     setImageName(file.name);
     setImageSizeKb((file.size / 1024).toFixed(1));
     setHasResult(false);
+    setIsDownloaded(false);
     setDownloadUrl(null);
     setResultMeta(null);
 
@@ -112,6 +114,7 @@ export default function UpscalePage() {
     setOrigDimensions(null);
     setCurrentAspectRatio(undefined);
     setHasResult(false);
+    setIsDownloaded(false);
     setDownloadUrl(null);
     setResultMeta(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -120,6 +123,7 @@ export default function UpscalePage() {
   const handleStartUpscale = async () => {
     if (!beforeImg) return;
     setIsProcessing(true);
+    setIsDownloaded(false);
     setResultMeta(null);
     setProgress({ percent: 1, stage: `Initializing ${selectedModel.toUpperCase()} Engine...` });
 
@@ -474,8 +478,13 @@ export default function UpscalePage() {
                 <Button
                   variant="primary"
                   size="md"
-                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold h-11 text-xs sm:text-sm shadow-lg shadow-emerald-500/20"
+                  className={`w-full sm:w-auto font-bold h-11 text-xs sm:text-sm shadow-lg transition-all ${
+                    isDownloaded
+                      ? "bg-emerald-400 hover:bg-emerald-300 text-slate-950 shadow-emerald-400/30 ring-2 ring-emerald-300"
+                      : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20"
+                  }`}
                   onClick={() => {
+                    setIsDownloaded(true);
                     const a = document.createElement("a");
                     a.href = downloadUrl;
                     a.download = `grainox-upscaled-${scale}x-${resultMeta.width}x${resultMeta.height}.png`;
@@ -483,9 +492,17 @@ export default function UpscalePage() {
                     a.click();
                     document.body.removeChild(a);
                   }}
-                  leftIcon={<Download className="w-4 h-4" />}
+                  leftIcon={
+                    isDownloaded ? (
+                      <CheckCircle2 className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )
+                  }
                 >
-                  {t.tools.upscale.btnDownload} ({resultMeta.sizeMb} MB)
+                  {isDownloaded
+                    ? `Tersimpan! Unduh Ulang (${resultMeta.sizeMb} MB)`
+                    : `${t.tools.upscale.btnDownload} (${resultMeta.sizeMb} MB)`}
                 </Button>
               )}
 

@@ -53,6 +53,7 @@ export default function DownloaderPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [downloadData, setDownloadData] = useState<DownloaderResult | null>(null);
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
+  const [downloadedUrls, setDownloadedUrls] = useState<Set<string>>(new Set());
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   // Video & Audio In-Place Preview States
@@ -142,6 +143,7 @@ export default function DownloaderPage() {
       }
 
       setDownloadData(json.data);
+      setDownloadedUrls(new Set());
       saveToHistory(json.data, targetUrl);
       recordToolUsage("download");
 
@@ -159,6 +161,7 @@ export default function DownloaderPage() {
 
   const handleDownloadFile = (item: MediaDownloadItem) => {
     setDownloadingUrl(item.url);
+    setDownloadedUrls((prev) => new Set(prev).add(item.url));
 
     const cleanFilename = `grainox-${downloadData?.platform || "media"}-${Date.now()}.${item.format || "mp4"}`;
     const streamUrl = `/api/download/stream?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(cleanFilename)}`;
@@ -393,6 +396,7 @@ export default function DownloaderPage() {
                   const isVideo = item.type === "video";
                   const isAudio = item.type === "audio";
                   const Icon = isVideo ? Video : isAudio ? Music : ImageIcon;
+                  const isDownloaded = downloadedUrls.has(item.url);
 
                   // Clean display label based on item type and format
                   const displayQuality = isAudio
@@ -402,7 +406,11 @@ export default function DownloaderPage() {
                   return (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-3 rounded-xl bg-[#161B26] hover:bg-[#1C2332] border border-white/10 hover:border-amber-500/40 text-left transition-all group"
+                      className={`flex items-center justify-between p-3 rounded-xl border text-left transition-all group ${
+                        isDownloaded
+                          ? "bg-[#0E1A17] border-emerald-500/50 shadow-sm shadow-emerald-500/10"
+                          : "bg-[#161B26] hover:bg-[#1C2332] border-white/10 hover:border-amber-500/40"
+                      }`}
                     >
                       <button
                         type="button"
@@ -410,13 +418,25 @@ export default function DownloaderPage() {
                         disabled={downloadingUrl === item.url}
                         className="flex items-center gap-3 min-w-0 flex-1 text-left focus:outline-none"
                       >
-                        <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition-transform">
-                          <Icon className="w-4 h-4" />
+                        <div
+                          className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                            isDownloaded
+                              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                              : "bg-amber-500/10 border-amber-500/25 text-amber-400"
+                          }`}
+                        >
+                          {isDownloaded ? <Check className="w-4 h-4 stroke-[3]" /> : <Icon className="w-4 h-4" />}
                         </div>
                         <div className="min-w-0 flex-1 pr-2">
                           <div className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors flex items-center gap-2">
                             <span className="whitespace-nowrap">{displayQuality}</span>
-                            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/[0.08] text-slate-200 shrink-0">
+                            <span
+                              className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded shrink-0 ${
+                                isDownloaded
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                  : "bg-white/[0.08] text-slate-200"
+                              }`}
+                            >
                               {item.format}
                             </span>
                           </div>
@@ -432,11 +452,19 @@ export default function DownloaderPage() {
                           type="button"
                           onClick={() => handleDownloadFile(item)}
                           disabled={downloadingUrl === item.url}
-                          className="w-8 h-8 rounded-lg bg-white/[0.05] hover:bg-amber-500 hover:text-[#080A0E] flex items-center justify-center text-slate-200 transition-colors"
-                          title="Download"
-                          aria-label="Download"
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                            isDownloaded
+                              ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/30 scale-105"
+                              : "bg-white/[0.05] hover:bg-amber-500 hover:text-[#080A0E] text-slate-200"
+                          }`}
+                          title={isDownloaded ? "Berhasil Diunduh" : "Download"}
+                          aria-label={isDownloaded ? "Berhasil Diunduh" : "Download"}
                         >
-                          <Download className="w-4 h-4" />
+                          {isDownloaded ? (
+                            <Check className="w-4 h-4 stroke-[3]" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
                         </button>
                       </div>
                     </div>

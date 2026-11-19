@@ -630,6 +630,123 @@ async function extractFacebook(rawUrl: string): Promise<any> {
   throw new Error("Gagal mengunduh video Facebook. Pastikan video atau reel bersifat publik.");
 }
 
+function extractYoutubeVideoId(rawUrl: string): string | null {
+  const m = rawUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/i);
+  return m ? m[1] : null;
+}
+
+// Ekstraktor YouTube dengan Multi-Tier Architecture (btch.youtube -> btch.aio -> scrapr)
+async function extractYoutube(rawUrl: string): Promise<any> {
+  const videoId = extractYoutubeVideoId(rawUrl);
+  const normalizedUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : rawUrl;
+
+  // Tier 1: btch-downloader youtube (Direct HD video + 320kbps MP3 stream)
+  try {
+    const ytFn =
+      typeof (btch as any).youtube === "function"
+        ? (btch as any).youtube
+        : (btch as any).default?.youtube;
+
+    if (typeof ytFn === "function") {
+      const res: any = await ytFn(normalizedUrl);
+      if (res && (res.mp4 || res.mp3 || res.status)) {
+        const downloads: MediaDownloadItem[] = [];
+        if (res.mp4) {
+          downloads.push({
+            type: "video",
+            quality: "HD Video (MP4)",
+            format: "mp4",
+            url: res.mp4,
+          });
+        }
+        if (res.mp3) {
+          downloads.push({
+            type: "audio",
+            quality: "Audio MP3",
+            format: "mp3",
+            url: res.mp3,
+          });
+        }
+        if (downloads.length > 0) {
+          return {
+            status: true,
+            result: {
+              title: res.title || "YouTube Video",
+              author: res.author || "YouTube Creator",
+              thumbnail:
+                res.thumbnail || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : ""),
+              downloads,
+            },
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("YouTube Tier 1 btch.youtube error:", err);
+  }
+
+  // Tier 2: btch-downloader aio
+  try {
+    const aioFn =
+      typeof (btch as any).aio === "function"
+        ? (btch as any).aio
+        : (btch as any).default?.aio;
+
+    if (typeof aioFn === "function") {
+      const aioRes: any = await aioFn(normalizedUrl);
+      const data = aioRes?.result || aioRes?.data || aioRes;
+      if (data && (data.url || data.video || data.mp4 || data.audio || data.mp3)) {
+        const downloads: MediaDownloadItem[] = [];
+        const videoUrl = data.url || data.video || data.mp4;
+        const audioUrl = data.audio || data.mp3;
+        if (videoUrl) {
+          downloads.push({
+            type: "video",
+            quality: "HD Video (MP4)",
+            format: "mp4",
+            url: videoUrl,
+          });
+        }
+        if (audioUrl) {
+          downloads.push({
+            type: "audio",
+            quality: "Audio MP3",
+            format: "mp3",
+            url: audioUrl,
+          });
+        }
+        if (downloads.length > 0) {
+          return {
+            status: true,
+            result: {
+              title: data.title || "YouTube Video",
+              author: data.author || "YouTube Creator",
+              thumbnail:
+                data.thumbnail || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : ""),
+              downloads,
+            },
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("YouTube Tier 2 btch.aio error:", err);
+  }
+
+  // Tier 3: scrapr youtube methods
+  try {
+    const s1 = await (scrapr as any).youtube.ytmp3gg(normalizedUrl, "mp4");
+    if (s1?.status && s1?.result) return s1;
+  } catch {}
+
+  try {
+    const s2 = await (scrapr as any).youtube.ytmp3(normalizedUrl, "mp4");
+    if (s2?.status && s2?.result) return s2;
+  } catch {}
+
+  throw new Error("Gagal mengunduh video YouTube. Pastikan link video publik dan bukan live stream.");
+}
+
 // Ekstraktor dengan Multi-Tier Fallback agar reliabilitas 99%
 export async function extractMedia(rawUrl: string): Promise<DownloaderResult> {
   const trimmedUrl = rawUrl.trim();
@@ -660,6 +777,7 @@ export async function extractMedia(rawUrl: string): Promise<DownloaderResult> {
     case "instagram": {
       platformLabel = "Instagram";
       const methods = [
+        () => (btch as any).igdl(trimmedUrl),
         () => (scrapr as any).instagram.snapsave(trimmedUrl),
         () => (scrapr as any).instagram.indown(trimmedUrl),
         () => (scrapr as any).instagram.direct(trimmedUrl),
@@ -679,11 +797,7 @@ export async function extractMedia(rawUrl: string): Promise<DownloaderResult> {
 
     case "youtube": {
       platformLabel = "YouTube";
-      const methods = [
-        () => (scrapr as any).youtube.ytmp3(trimmedUrl, "mp4"),
-        () => (scrapr as any).youtube.ytmp3gg(trimmedUrl, "mp4"),
-      ];
-      extractionData = await runWithFallback(methods);
+      extractionData = await extractYoutube(trimmedUrl);
       break;
     }
 
@@ -872,6 +986,20 @@ export async function extractMedia(rawUrl: string): Promise<DownloaderResult> {
       url: normalizedUrl,
       size: item.size || item.fileSize || undefined,
     });
+  }
+
+  // Khusus Instagram Reel/Video & YouTube: pastikan SELALU tersedia opsi download Audio MP3!
+  if (platform === "instagram" || platform === "youtube") {
+    const hasAudio = downloads.some((d) => d.type === "audio");
+    const videoItem = downloads.find((d) => d.type === "video");
+    if (!hasAudio && videoItem) {
+      downloads.push({
+        type: "audio",
+        quality: "Audio MP3",
+        format: "mp3",
+        url: videoItem.url,
+      });
+    }
   }
 
   // Fallback jika downloads kosong tapi ada direct url di root

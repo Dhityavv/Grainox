@@ -59,7 +59,10 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const contentType = res.headers.get("content-type") || (isInline ? "video/mp4" : "application/octet-stream");
+    let contentType = res.headers.get("content-type") || (isInline ? "video/mp4" : "application/octet-stream");
+    if (filename.toLowerCase().endsWith(".mp3") || searchParams.get("format") === "mp3") {
+      contentType = "audio/mpeg";
+    }
     const responseHeaders = new Headers();
     responseHeaders.set("Content-Type", contentType);
     responseHeaders.set("Accept-Ranges", "bytes");
