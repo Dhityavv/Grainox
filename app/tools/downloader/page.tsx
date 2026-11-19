@@ -520,94 +520,123 @@ export default function DownloaderPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2.5">
                 {downloadData.downloads.map((item, idx) => {
                   const isVideo = item.type === "video";
                   const isAudio = item.type === "audio";
                   const Icon = isVideo ? Video : isAudio ? Music : ImageIcon;
                   const isDownloaded = downloadedUrls.has(item.url);
+                  const isCurrentDownloading = downloadingUrl === item.url;
 
                   // Clean display label based on item type and format
-                  const displayQuality = isAudio
-                    ? "MP3 Audio"
-                    : item.quality.replace(/\s*\(.*?\)/g, "").trim() || (isVideo ? "Video" : "Photo");
+                  let displayQuality = item.quality.replace(/\s*\(.*?\)/g, "").trim();
+                  if (isAudio) {
+                    displayQuality = "Audio MP3";
+                  } else if (displayQuality.toLowerCase().includes("1080")) {
+                    displayQuality = "Full HD Video (1080p)";
+                  } else if (displayQuality.toLowerCase().includes("720")) {
+                    displayQuality = "HD Video (720p)";
+                  } else if (!displayQuality || displayQuality.toLowerCase() === "video") {
+                    displayQuality = isVideo ? "Video MP4" : "Photo HD";
+                  }
 
-                  const isCurrentDownloading = downloadingUrl === item.url;
+                  const formatLabel = (item.format || (isAudio ? "mp3" : "mp4")).toUpperCase();
+                  const showFormatBadge = !displayQuality.toUpperCase().includes(formatLabel);
 
                   return (
                     <div
                       key={idx}
-                      className={`flex flex-col p-3 rounded-xl border text-left transition-all group ${
+                      onClick={() => !isCurrentDownloading && handleDownloadFile(item)}
+                      className={`flex flex-col p-3 sm:p-3.5 rounded-xl border text-left transition-all cursor-pointer group ${
                         isDownloaded
                           ? "bg-[#0E1A17] border-emerald-500/50 shadow-sm shadow-emerald-500/10"
                           : "bg-[#161B26] hover:bg-[#1C2332] border-white/10 hover:border-amber-500/40"
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadFile(item)}
-                          disabled={isCurrentDownloading}
-                          className="flex items-center gap-3 min-w-0 flex-1 text-left focus:outline-none"
-                        >
+                      <div className="flex items-center justify-between gap-3">
+                        {/* Media Stream Info */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div
-                            className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                            className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
                               isDownloaded
                                 ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
                                 : isCurrentDownloading
                                 ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                                : isAudio
+                                ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
                                 : "bg-amber-500/10 border-amber-500/25 text-amber-400"
                             }`}
                           >
                             {isDownloaded ? (
-                              <Check className="w-4 h-4 stroke-[3]" />
+                              <Check className="w-5 h-5 stroke-[2.5]" />
                             ) : isCurrentDownloading ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                              <Loader2 className="w-5 h-5 animate-spin text-amber-400" />
                             ) : (
-                              <Icon className="w-4 h-4" />
+                              <Icon className="w-5 h-5" />
                             )}
                           </div>
-                          <div className="min-w-0 flex-1 pr-2">
-                            <div className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors flex items-center gap-2">
-                              <span className="whitespace-nowrap">{displayQuality}</span>
-                              <span
-                                className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded shrink-0 ${
-                                  isDownloaded
-                                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                                    : "bg-white/[0.08] text-slate-200"
-                                }`}
-                              >
-                                {item.format}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
+                                {displayQuality}
+                              </span>
+                              {showFormatBadge && (
+                                <span
+                                  className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-semibold shrink-0 ${
+                                    isDownloaded
+                                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                      : "bg-white/[0.08] text-slate-300 border border-white/10"
+                                  }`}
+                                >
+                                  {formatLabel}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono mt-0.5">
+                              {item.size && <span>{item.size}</span>}
+                              {item.size && <span>•</span>}
+                              <span className="text-slate-400">
+                                {isAudio ? "Audio Stream" : isVideo ? "Direct Video" : "High-Res Image"}
                               </span>
                             </div>
-                            {item.size && (
-                              <div className="text-[11px] text-slate-400 font-mono mt-0.5">{item.size}</div>
-                            )}
                           </div>
-                        </button>
+                        </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {/* Download File Button */}
+                        {/* Direct Download Button (Clean, spacious, zero Play button) */}
+                        <div className="shrink-0">
                           <button
                             type="button"
-                            onClick={() => handleDownloadFile(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownloadFile(item);
+                            }}
                             disabled={isCurrentDownloading}
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                            className={`h-9 px-3.5 sm:px-4 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm ${
                               isDownloaded
-                                ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/30 scale-105"
+                                ? "bg-emerald-500 text-slate-950 shadow-emerald-500/25 font-extrabold hover:bg-emerald-400"
                                 : isCurrentDownloading
                                 ? "bg-amber-500 text-slate-950 font-bold"
-                                : "bg-white/[0.05] hover:bg-amber-500 hover:text-[#080A0E] text-slate-200"
+                                : "bg-amber-500/15 hover:bg-amber-500 text-amber-400 hover:text-slate-950 border border-amber-500/30 group-hover:bg-amber-500 group-hover:text-slate-950"
                             }`}
-                            title={isDownloaded ? "Berhasil Diunduh" : "Download"}
-                            aria-label={isDownloaded ? "Berhasil Diunduh" : "Download"}
+                            title={isDownloaded ? t.tools.downloader.downloadedBtn : t.tools.downloader.downloadBtn}
+                            aria-label={isDownloaded ? t.tools.downloader.downloadedBtn : t.tools.downloader.downloadBtn}
                           >
                             {isDownloaded ? (
-                              <Check className="w-4 h-4 stroke-[3]" />
+                              <>
+                                <Check className="w-4 h-4 stroke-[3]" />
+                                <span className="hidden sm:inline">{t.tools.downloader.downloadedBtn}</span>
+                              </>
                             ) : isCurrentDownloading ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="hidden sm:inline">{t.tools.downloader.downloadingBtn}</span>
+                              </>
                             ) : (
-                              <Download className="w-4 h-4" />
+                              <>
+                                <Download className="w-4 h-4" />
+                                <span className="hidden sm:inline">{t.tools.downloader.downloadBtn}</span>
+                              </>
                             )}
                           </button>
                         </div>

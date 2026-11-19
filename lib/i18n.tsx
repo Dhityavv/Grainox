@@ -187,6 +187,9 @@ export interface Translations {
       closePreview: string;
       previewAudio: string;
       previewReady: string;
+      downloadBtn: string;
+      downloadingBtn: string;
+      downloadedBtn: string;
     };
     converter: {
       title: string;
@@ -420,7 +423,10 @@ export const translations: Record<Language, Translations> = {
         previewTitle: "Live Media Preview",
         closePreview: "Close Preview",
         previewAudio: "Listen to Audio",
-        previewReady: "Click to play & preview before downloading",
+        previewReady: "Click video preview to play, or select format below:",
+        downloadBtn: "Download",
+        downloadingBtn: "Downloading...",
+        downloadedBtn: "Downloaded",
       },
       converter: {
         title: "Universal Image Converter",
@@ -652,7 +658,10 @@ export const translations: Record<Language, Translations> = {
         previewTitle: "Pratinjau Media Langsung",
         closePreview: "Tutup Pratinjau",
         previewAudio: "Dengarkan Audio",
-        previewReady: "Klik untuk memutar video langsung sebelum diunduh",
+        previewReady: "Klik pratinjau di samping untuk memutar, atau unduh di bawah:",
+        downloadBtn: "Unduh",
+        downloadingBtn: "Mengunduh...",
+        downloadedBtn: "Berhasil",
       },
       converter: {
         title: "Universal Image Converter",
