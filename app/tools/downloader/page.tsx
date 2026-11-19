@@ -388,7 +388,7 @@ export default function DownloaderPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {downloadData.downloads.map((item, idx) => {
                   const isVideo = item.type === "video";
                   const isAudio = item.type === "audio";
@@ -402,21 +402,21 @@ export default function DownloaderPage() {
                   return (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-[#161B26] hover:bg-[#1C2332] border border-white/10 hover:border-amber-500/40 text-left transition-all group"
+                      className="flex items-center justify-between p-3 rounded-xl bg-[#161B26] hover:bg-[#1C2332] border border-white/10 hover:border-amber-500/40 text-left transition-all group"
                     >
                       <button
                         type="button"
                         onClick={() => handleDownloadFile(item)}
                         disabled={downloadingUrl === item.url}
-                        className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 text-left focus:outline-none"
+                        className="flex items-center gap-3 min-w-0 flex-1 text-left focus:outline-none"
                       >
-                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition-transform">
+                        <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition-transform">
                           <Icon className="w-4 h-4" />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors flex items-center gap-1.5 truncate">
-                            <span className="truncate">{displayQuality}</span>
-                            <span className="text-[9px] sm:text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/[0.08] text-slate-200 shrink-0">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <div className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors flex items-center gap-2">
+                            <span className="whitespace-nowrap">{displayQuality}</span>
+                            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/[0.08] text-slate-200 shrink-0">
                               {item.format}
                             </span>
                           </div>
@@ -426,23 +426,7 @@ export default function DownloaderPage() {
                         </div>
                       </button>
 
-                      <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
-                        {/* Play Preview Button for Video Stream */}
-                        {isVideo && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveVideoUrl(item.url);
-                              setIsPlayingVideo(true);
-                            }}
-                            className="p-1.5 sm:p-2 rounded-lg bg-white/[0.05] hover:bg-amber-500 hover:text-slate-950 text-slate-300 transition-colors"
-                            title={t.tools.downloader.watchVideo}
-                            aria-label={t.tools.downloader.watchVideo}
-                          >
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                          </button>
-                        )}
-
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {/* Download File Button */}
                         <button
                           type="button"

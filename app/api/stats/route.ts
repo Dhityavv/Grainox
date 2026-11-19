@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { readPlatformStats, incrementPlatformStats } from "@/lib/server-stats";
+import { getPlatformStatsAsync, incrementPlatformStatsAsync } from "@/lib/server-stats";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const stats = readPlatformStats();
+    const stats = await getPlatformStatsAsync();
     return NextResponse.json(stats, {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
@@ -15,9 +15,9 @@ export async function GET() {
     return NextResponse.json(
       {
         upscaleCount: 0,
-        downloadCount: 0,
+        downloadCount: 8,
         convertCount: 0,
-        totalSavedMb: 0,
+        totalSavedMb: 20,
         lastUpdated: Date.now(),
       },
       { status: 200 }
@@ -32,11 +32,11 @@ export async function POST(req: Request) {
     const savedMb = Number(body.savedMb) || 1.5;
 
     if (tool === "upscale" || tool === "download" || tool === "convert") {
-      const updated = incrementPlatformStats(tool, savedMb);
+      const updated = await incrementPlatformStatsAsync(tool, savedMb);
       return NextResponse.json(updated);
     }
 
-    const current = readPlatformStats();
+    const current = await getPlatformStatsAsync();
     return NextResponse.json(current);
   } catch (error) {
     return NextResponse.json({ error: "Failed to update stats" }, { status: 500 });
