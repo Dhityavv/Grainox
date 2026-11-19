@@ -31,7 +31,7 @@ export default function Footer() {
               <GrainoxLogo size={26} />
               <span className="font-bold text-base text-white tracking-tight">Grainox</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400 border border-white/5">
-                v1.1
+                v1.0
               </span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed font-normal">

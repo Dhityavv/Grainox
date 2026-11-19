@@ -65,7 +65,7 @@ export default function Navbar({ onOpenInfo }: NavbarProps) {
                 Grainox
               </span>
               <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400 border border-white/5 hidden sm:inline-block">
-                v1.1
+                v1.0
               </span>
             </CleanLink>
 

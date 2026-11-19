@@ -72,7 +72,7 @@ export default function InfoModal({ isOpen, onClose }: InfoModalProps) {
                   <h2 id="info-dialog-title" className="text-base font-bold tracking-tight text-white flex items-center gap-2">
                     {t.infoModal.title}
                     <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                      v1.1
+                      v1.0
                     </span>
                   </h2>
                   <p className="text-[11px] text-slate-400">{t.infoModal.subtitle}</p>

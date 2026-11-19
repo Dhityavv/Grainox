@@ -225,7 +225,7 @@ export const translations: Record<Language, Translations> = {
       downloader: "Downloader",
       converter: "Converter",
       info: "Info",
-      version: "v1.1",
+      version: "v1.0",
       toggleLangTitle: "Ganti ke Bahasa Indonesia",
     },
     hero: {
@@ -457,7 +457,7 @@ export const translations: Record<Language, Translations> = {
       downloader: "Downloader",
       converter: "Converter",
       info: "Info",
-      version: "v1.1",
+      version: "v1.0",
       toggleLangTitle: "Switch to English",
     },
     hero: {
