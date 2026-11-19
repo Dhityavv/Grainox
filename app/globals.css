@@ -1,0 +1,73 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Base sizing, smooth scrolling and scrollbar removal */
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: #090B10;
+  color: #F8FAFC;
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Sembunyikan scrollbar bawaan browser */
+::-webkit-scrollbar {
+  display: none;
+  width: 0px;
+  background: transparent;
+}
+
+/* Calm, Focused Card Surface */
+.clean-card {
+  background-color: #11141D;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1rem;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.clean-card:hover {
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
+/* Micro-interaction hover */
+.btn-pop {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-pop:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 8px 20px -6px rgba(245, 158, 11, 0.3);
+}
+.btn-pop:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.chip-pop {
+  transition: all 0.15s ease;
+}
+.chip-pop:hover {
+  transform: translateY(-1px);
+}
+
+/* 21st.dev Border Beam Animation */
+@keyframes border-beam {
+  100% {
+    offset-distance: 100%;
+  }
+}
