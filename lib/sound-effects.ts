@@ -1,12 +1,16 @@
 "use client";
 
-// Web Audio API Sound Effects Synthesizer for Grainox
-// 100% client-side, zero external asset downloads, instant playback.
+// Studio-Grade UI Sound Engine for Grainox
+// Powered by Web Audio API & Curated Artlist / Kenney Studio Sound Assets (CC0 Royalty-Free)
+// 100% Client-Side, Zero Network Dependencies, Zero Latency.
+
+import { SOUND_ASSETS } from "./sound-assets";
 
 const SOUND_STORAGE_KEY = "grainox_sound_enabled";
 
 let audioCtx: AudioContext | null = null;
 let masterGain: GainNode | null = null;
+const audioBufferCache: Map<string, AudioBuffer> = new Map();
 
 // Throttling for scroll ticks so it doesn't sound cacophonous
 let lastScrollSoundTime = 0;
@@ -20,9 +24,12 @@ export function getAudioContext(): AudioContext | null {
       if (AudioContextClass) {
         audioCtx = new AudioContextClass();
         masterGain = audioCtx.createGain();
-        // 50% comfortable perceived master volume
-        masterGain.gain.setValueAtTime(0.55, audioCtx.currentTime);
+        // Increased volume by 20% by default as requested: ~0.72 perceived volume
+        masterGain.gain.setValueAtTime(0.72, audioCtx.currentTime);
         masterGain.connect(audioCtx.destination);
+
+        // Preload key sounds in the background
+        preloadSounds(audioCtx);
       }
     }
     return audioCtx;
@@ -31,17 +38,82 @@ export function getAudioContext(): AudioContext | null {
   }
 }
 
-function withAudioContext(callback: (ctx: AudioContext, master: GainNode) => void) {
+/**
+ * Convert base64 data URI directly to ArrayBuffer without network fetch
+ */
+function dataUriToArrayBuffer(dataUri: string): ArrayBuffer {
+  const base64 = dataUri.split(",")[1];
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+/**
+ * Pre-decode sound assets for zero-latency instant playback
+ */
+async function preloadSounds(ctx: AudioContext): Promise<void> {
+  const soundEntries = Object.values(SOUND_ASSETS);
+  for (const uri of soundEntries) {
+    if (!audioBufferCache.has(uri)) {
+      try {
+        const buffer = dataUriToArrayBuffer(uri);
+        // decodeAudioData consumes the buffer, so pass a clone
+        const decoded = await ctx.decodeAudioData(buffer.slice(0));
+        audioBufferCache.set(uri, decoded);
+      } catch (_) {}
+    }
+  }
+}
+
+/**
+ * Play a studio-grade sound buffer through the master gain
+ */
+function playSoundAsset(dataUri: string, volume = 1.0): void {
   if (!isSoundEnabled()) return;
   const ctx = getAudioContext();
   if (!ctx || !masterGain) return;
 
+  const playBuffer = (buffer: AudioBuffer) => {
+    try {
+      const source = ctx.createBufferSource();
+      const gainNode = ctx.createGain();
+
+      gainNode.gain.setValueAtTime(volume, ctx.currentTime);
+      source.buffer = buffer;
+
+      source.connect(gainNode);
+      gainNode.connect(masterGain!);
+
+      source.start(0);
+    } catch (_) {}
+  };
+
+  const ensureContextAndPlay = () => {
+    const cached = audioBufferCache.get(dataUri);
+    if (cached) {
+      playBuffer(cached);
+    } else {
+      // Decode on demand if not yet cached
+      try {
+        const buffer = dataUriToArrayBuffer(dataUri);
+        ctx.decodeAudioData(buffer.slice(0)).then((decoded) => {
+          audioBufferCache.set(dataUri, decoded);
+          playBuffer(decoded);
+        }).catch(() => {});
+      } catch (_) {}
+    }
+  };
+
   if (ctx.state === "suspended") {
     ctx.resume().then(() => {
-      if (masterGain) callback(ctx, masterGain);
+      ensureContextAndPlay();
     }).catch(() => {});
   } else {
-    callback(ctx, masterGain);
+    ensureContextAndPlay();
   }
 }
 
@@ -76,212 +148,54 @@ export function toggleSound(): boolean {
 }
 
 /**
- * Tactile mechanical UI tap on button / link click (crisp, pleasant, ~50% volume)
+ * Tactile Artlist-grade button / link click tap
  */
 export function playClickSound(): void {
-  withAudioContext((ctx, master) => {
-    try {
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      // Clean tactile pop: drops from 1200Hz to 380Hz over 70ms
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(1180, now);
-      osc.frequency.exponentialRampToValueAtTime(360, now + 0.07);
-
-      // Volume envelope: punchy attack then gentle release
-      gain.gain.setValueAtTime(0.48, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
-
-      osc.connect(gain);
-      gain.connect(master);
-
-      osc.start(now);
-      osc.stop(now + 0.08);
-
-      // Secondary subtle mechanical sub-click for realistic tactile feel
-      const subOsc = ctx.createOscillator();
-      const subGain = ctx.createGain();
-      subOsc.type = "triangle";
-      subOsc.frequency.setValueAtTime(450, now);
-      subOsc.frequency.exponentialRampToValueAtTime(120, now + 0.05);
-
-      subGain.gain.setValueAtTime(0.25, now);
-      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-
-      subOsc.connect(subGain);
-      subGain.connect(master);
-
-      subOsc.start(now);
-      subOsc.stop(now + 0.055);
-    } catch (_) {}
-  });
+  playSoundAsset(SOUND_ASSETS.CLICK, 1.0);
 }
 
 /**
- * Modern mechanical scroll / wheel tick sound
- * Throttled to ~75ms interval to create an authentic haptic wheel experience
+ * Subtle scroll & wheel mechanical tick sound
+ * Throttled to ~75ms interval for natural haptic feel
  */
 export function playScrollSound(): void {
   const nowMs = Date.now();
   if (nowMs - lastScrollSoundTime < 75) return;
   lastScrollSoundTime = nowMs;
 
-  withAudioContext((ctx, master) => {
-    try {
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      // High-frequency subtle notch tick
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(1600, now);
-      osc.frequency.exponentialRampToValueAtTime(750, now + 0.022);
-
-      gain.gain.setValueAtTime(0.18, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
-
-      osc.connect(gain);
-      gain.connect(master);
-
-      osc.start(now);
-      osc.stop(now + 0.026);
-    } catch (_) {}
-  });
+  playSoundAsset(SOUND_ASSETS.SCROLL, 0.7);
 }
 
 /**
- * Soft tick when dragging files over a dropzone
+ * Drag hover sound when files enter a dropzone
  */
 export function playDragHoverSound(): void {
-  withAudioContext((ctx, master) => {
-    try {
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(920, now);
-      osc.frequency.exponentialRampToValueAtTime(540, now + 0.045);
-
-      gain.gain.setValueAtTime(0.35, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
-
-      osc.connect(gain);
-      gain.connect(master);
-
-      osc.start(now);
-      osc.stop(now + 0.046);
-    } catch (_) {}
-  });
+  playSoundAsset(SOUND_ASSETS.CLICK_ALT, 0.85);
 }
 
 /**
- * Satisfying bubble pop when dropping files
+ * Satisfying acoustic pop when dropping files
  */
 export function playDropSound(): void {
-  withAudioContext((ctx, master) => {
-    try {
-      const now = ctx.currentTime;
-
-      // Primary tone
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(280, now);
-      osc.frequency.exponentialRampToValueAtTime(720, now + 0.1);
-
-      gain.gain.setValueAtTime(0.5, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
-
-      osc.connect(gain);
-      gain.connect(master);
-
-      osc.start(now);
-      osc.stop(now + 0.11);
-
-      // Subtle warm undertone
-      const subOsc = ctx.createOscillator();
-      const subGain = ctx.createGain();
-
-      subOsc.type = "triangle";
-      subOsc.frequency.setValueAtTime(180, now);
-      subOsc.frequency.exponentialRampToValueAtTime(360, now + 0.09);
-
-      subGain.gain.setValueAtTime(0.32, now);
-      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-
-      subOsc.connect(subGain);
-      subGain.connect(master);
-
-      subOsc.start(now);
-      subOsc.stop(now + 0.095);
-    } catch (_) {}
-  });
+  playSoundAsset(SOUND_ASSETS.DROP, 1.0);
 }
 
 /**
- * Uplifting modern chord chime on successful process or download completion
+ * Uplifting harmonic chime on successful task or download completion
  */
 export function playSuccessSound(): void {
-  withAudioContext((ctx, master) => {
-    try {
-      // C5, E5, G5, C6 (Major triad)
-      const notes = [523.25, 659.25, 783.99, 1046.5];
-      const now = ctx.currentTime;
-
-      notes.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const noteStart = now + idx * 0.07;
-
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq, noteStart);
-
-        gain.gain.setValueAtTime(0.38, noteStart);
-        gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.38);
-
-        osc.connect(gain);
-        gain.connect(master);
-
-        osc.start(noteStart);
-        osc.stop(noteStart + 0.39);
-      });
-    } catch (_) {}
-  });
+  playSoundAsset(SOUND_ASSETS.SUCCESS, 1.0);
 }
 
 /**
- * Snappy tactile toggle switch sound
+ * Clean physical switch toggle sound
  */
 export function playToggleSound(enabled = true): void {
-  withAudioContext((ctx, master) => {
-    try {
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = "sine";
-      if (enabled) {
-        osc.frequency.setValueAtTime(540, now);
-        osc.frequency.setValueAtTime(960, now + 0.04);
-      } else {
-        osc.frequency.setValueAtTime(960, now);
-        osc.frequency.setValueAtTime(480, now + 0.04);
-      }
-
-      gain.gain.setValueAtTime(0.42, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-
-      osc.connect(gain);
-      gain.connect(master);
-
-      osc.start(now);
-      osc.stop(now + 0.095);
-    } catch (_) {}
-  });
+  if (enabled) {
+    playSoundAsset(SOUND_ASSETS.SWITCH_ON, 0.9);
+  } else {
+    playSoundAsset(SOUND_ASSETS.SWITCH_OFF, 0.9);
+  }
 }
 
 /**
