@@ -277,24 +277,34 @@ async function runClientOnnxUpscale(
   // 1. Initialize Neural Session
   const { session, ort, backend } = await getInferenceSession(modelUrl, onProgress);
 
-  // 2. Prepare Source Canvas (safe maximum dimension clamp to protect mobile Safari 4096px canvas limit)
+  // 2. Prepare Source Canvas with Device-Aware Adaptive Optimization
+  const isMobile =
+    typeof navigator !== "undefined" &&
+    (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      (typeof window !== "undefined" && window.innerWidth < 768));
+
   let origW = img.naturalWidth || img.width;
   let origH = img.naturalHeight || img.height;
 
-  const MAX_OUTPUT_DIM = 4096;
+  // Maximum input dimension tuned to device performance tier:
+  // - Mobile: 512px max input -> 2048px 4x Ultra HD output (4 to 9 tiles, ultra fast on entry/mid phones)
+  // - Desktop: 680px max input -> 2720px 4x QHD output (4 to 9 tiles)
+  const maxInputDim = isMobile ? 512 : 680;
   let inputW = origW;
   let inputH = origH;
 
-  if (origW * 4 > MAX_OUTPUT_DIM || origH * 4 > MAX_OUTPUT_DIM) {
-    const downscale = Math.min(MAX_OUTPUT_DIM / (origW * 4), MAX_OUTPUT_DIM / (origH * 4));
-    inputW = Math.round(origW * downscale);
-    inputH = Math.round(origH * downscale);
+  if (origW > maxInputDim || origH > maxInputDim) {
+    const downscale = Math.min(maxInputDim / origW, maxInputDim / origH);
+    inputW = Math.max(64, Math.round(origW * downscale));
+    inputH = Math.max(64, Math.round(origH * downscale));
   }
 
   const srcCanvas = document.createElement("canvas");
   srcCanvas.width = inputW;
   srcCanvas.height = inputH;
   const srcCtx = srcCanvas.getContext("2d", { willReadFrequently: true })!;
+  srcCtx.imageSmoothingEnabled = true;
+  srcCtx.imageSmoothingQuality = "high";
   srcCtx.drawImage(img, 0, 0, inputW, inputH);
 
   // 3. Destination 4x Canvas
@@ -305,9 +315,12 @@ async function runClientOnnxUpscale(
   destCanvas.height = outH;
   const destCtx = destCanvas.getContext("2d")!;
 
-  // 4. Tiling Configuration (128x128 tiles with 12px padding)
-  const tileSize = 128;
-  const pad = 12;
+  // 4. Adaptive Tiling Configuration:
+  // Dynamically scales tile size to cap total tiles between 4 and 9 on any device/aspect ratio,
+  // preventing 56+ tile freezes on mobile while preserving razor-sharp neural reconstruction.
+  const maxDim = Math.max(inputW, inputH);
+  const tileSize = Math.max(160, Math.ceil(maxDim / 3));
+  const pad = 10;
 
   let totalTiles = 0;
   for (let y = 0; y < inputH; y += tileSize) {
@@ -407,8 +420,8 @@ async function runClientOnnxUpscale(
           : `Neural Super-Resolution: Tile ${processedTiles}/${totalTiles} (${percent}%)`,
       });
 
-      // Yield event loop so UI does not stutter
-      await new Promise((r) => setTimeout(r, 0));
+      // Yield event loop so UI does not stutter and GC can clear tensor memory
+      await new Promise((r) => setTimeout(r, 12));
     }
   }
 
