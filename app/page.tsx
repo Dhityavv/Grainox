@@ -16,6 +16,7 @@ import {
 import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import Button from "@/components/ui/Button";
 import RetroGrid from "@/components/ui/RetroGrid";
+import CleanLink from "@/components/ui/CleanLink";
 import GlobalAnalyticsDashboard from "@/components/analytics/GlobalAnalyticsDashboard";
 import { useLanguage } from "@/lib/i18n";
 
@@ -76,13 +77,13 @@ export default function HomePage() {
 
         {/* CTA & Trust Principles */}
         <div className="hero-anim flex flex-col sm:flex-row items-center justify-center gap-4 mt-7">
-          <a
+          <CleanLink
             href="#modul-utilitas"
             className="btn-pop inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-sm transition-all shadow-md shadow-amber-500/15"
           >
             <span>{t.hero.ctaButton}</span>
             <ArrowDown className="w-4 h-4" />
-          </a>
+          </CleanLink>
 
           <div className="flex items-center gap-3 text-xs text-slate-400">
             <span className="flex items-center gap-1.5">

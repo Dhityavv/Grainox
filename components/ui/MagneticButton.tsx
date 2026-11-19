@@ -56,15 +56,9 @@ export default function MagneticButton({
   return (
     <div ref={containerRef} className="inline-block">
       {href ? (
-        href.startsWith("#") ? (
-          <a href={href} className={className}>
-            {children}
-          </a>
-        ) : (
-          <CleanLink href={href} className={className}>
-            {children}
-          </CleanLink>
-        )
+        <CleanLink href={href} className={className}>
+          {children}
+        </CleanLink>
       ) : (
         <button onClick={onClick} className={className} {...props}>
           {children}

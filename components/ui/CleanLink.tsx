@@ -22,6 +22,15 @@ export default function CleanLink({
     onClick?.(e);
     if (e.defaultPrevented) return;
 
+    if (href.startsWith("#")) {
+      const targetId = href.slice(1);
+      const el = document.getElementById(targetId) || document.querySelector(href);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      }
+      return;
+    }
+
     if (e.metaKey || e.ctrlKey) {
       window.open(href, "_blank");
     } else {
