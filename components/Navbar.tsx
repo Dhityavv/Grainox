@@ -43,7 +43,7 @@ export default function Navbar({ onOpenInfo }: NavbarProps) {
     { href: "/tools/upscale", label: t.nav.upscaler, icon: Sparkles },
     { href: "/tools/downloader", label: t.nav.downloader, icon: Download },
     { href: "/tools/converter", label: t.nav.converter, icon: ArrowRightLeft },
-    { href: "/tools/pdf", label: "PDF Tools", icon: FileText },
+    { href: "/tools/pdf", label: t.nav.pdfTools, icon: FileText },
   ];
 
   const isActive = (href: string, exact?: boolean) => {

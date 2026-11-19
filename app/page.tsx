@@ -11,6 +11,7 @@ import {
   Layers,
   ShieldCheck,
   Zap,
+  FileText,
 } from "lucide-react";
 import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import Button from "@/components/ui/Button";
@@ -156,96 +157,146 @@ export default function HomePage() {
             </Button>
           </div>
 
-          {/* Right Column (5 Cols): Downloader & Converter stacked */}
-          <div className="lg:col-span-5 flex flex-col gap-5 justify-between">
-            {/* Card 2: Universal Media Downloader */}
-            <div className="card-anim flex-1 clean-card p-5 sm:p-6 flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-start mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center text-amber-400">
-                    <Download className="w-4 h-4" />
-                  </div>
-                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-white/[0.05] text-slate-300 border border-white/10">
-                    {t.bento.downloaderBadge}
-                  </span>
+          {/* Card 2: Universal Media Downloader (5 Cols) */}
+          <div className="card-anim lg:col-span-5 clean-card p-5 sm:p-6 flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-3">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center text-amber-400">
+                  <Download className="w-4 h-4" />
                 </div>
-
-                <h3 className="text-lg font-bold text-white tracking-tight">
-                  {t.bento.downloaderTitle}
-                </h3>
-                <p className="text-sm text-slate-300 mt-1 mb-4 leading-relaxed font-normal">
-                  {t.bento.downloaderDesc}
-                </p>
-
-                {/* Platform Badge Strip (Clean & Readable) */}
-                <div className="flex flex-wrap gap-1.5 mb-5 text-xs text-slate-300">
-                  {["TikTok", "Instagram", "YouTube", "Twitter / X", "Spotify", "Pinterest"].map(
-                    (p) => (
-                      <span
-                        key={p}
-                        className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5"
-                      >
-                        {p}
-                      </span>
-                    )
-                  )}
-                </div>
+                <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-white/[0.05] text-slate-300 border border-white/10">
+                  {t.bento.downloaderBadge}
+                </span>
               </div>
 
-              <Button
-                href="/tools/downloader"
-                variant="outline"
-                size="md"
-                className="w-full justify-center font-semibold text-sm border-white/10 hover:border-amber-400/40"
-                rightIcon={<ArrowRight className="w-4 h-4 text-amber-400" />}
-              >
-                {t.bento.openDownloader}
-              </Button>
+              <h3 className="text-xl font-bold text-white tracking-tight">
+                {t.bento.downloaderTitle}
+              </h3>
+              <p className="text-sm text-slate-300 mt-1 mb-4 leading-relaxed font-normal">
+                {t.bento.downloaderDesc}
+              </p>
+
+              {/* Platform Badge Strip (Clean & Readable) */}
+              <div className="flex flex-wrap gap-1.5 mb-5 text-xs text-slate-300">
+                {["TikTok", "Instagram", "YouTube", "Twitter / X", "Spotify", "Pinterest", "Facebook"].map(
+                  (p) => (
+                    <span
+                      key={p}
+                      className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5"
+                    >
+                      {p}
+                    </span>
+                  )
+                )}
+              </div>
             </div>
 
-            {/* Card 3: Image & File Converter */}
-            <div className="card-anim flex-1 clean-card p-5 sm:p-6 flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-start mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center text-amber-400">
-                    <ArrowRightLeft className="w-4 h-4" />
-                  </div>
-                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-white/[0.05] text-slate-300 border border-white/10">
-                    {t.bento.converterBadge}
-                  </span>
-                </div>
+            <Button
+              href="/tools/downloader"
+              variant="outline"
+              size="md"
+              className="w-full justify-center font-semibold text-sm border-white/10 hover:border-amber-400/40"
+              rightIcon={<ArrowRight className="w-4 h-4 text-amber-400" />}
+            >
+              {t.bento.openDownloader}
+            </Button>
+          </div>
 
-                <h3 className="text-lg font-bold text-white tracking-tight">
-                  {t.bento.converterTitle}
-                </h3>
-                <p className="text-sm text-slate-300 mt-1 mb-4 leading-relaxed font-normal">
-                  {t.bento.converterDesc}
-                </p>
-
-                {/* Conversion Badges */}
-                <div className="flex flex-wrap gap-1.5 mb-5 text-xs text-slate-300">
-                  <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
-                    {t.bento.webpPill}
-                  </span>
-                  <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
-                    {t.bento.pngPill}
-                  </span>
-                  <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
-                    {t.bento.jpgPill}
-                  </span>
+          {/* Card 3: Universal File Converter (6 Cols) */}
+          <div className="card-anim lg:col-span-6 clean-card p-5 sm:p-6 flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-3">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center text-amber-400">
+                  <ArrowRightLeft className="w-4 h-4" />
                 </div>
+                <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-white/[0.05] text-slate-300 border border-white/10">
+                  {t.bento.converterBadge}
+                </span>
               </div>
 
-              <Button
-                href="/tools/converter"
-                variant="outline"
-                size="md"
-                className="w-full justify-center font-semibold text-sm border-white/10 hover:border-amber-400/40"
-                rightIcon={<ArrowRight className="w-4 h-4 text-amber-400" />}
-              >
-                {t.bento.openConverter}
-              </Button>
+              <h3 className="text-lg font-bold text-white tracking-tight">
+                {t.bento.converterTitle}
+              </h3>
+              <p className="text-sm text-slate-300 mt-1 mb-4 leading-relaxed font-normal">
+                {t.bento.converterDesc}
+              </p>
+
+              {/* Conversion Badges */}
+              <div className="flex flex-wrap gap-1.5 mb-5 text-xs text-slate-300">
+                <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
+                  {t.bento.webpPill}
+                </span>
+                <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
+                  {t.bento.pngPill}
+                </span>
+                <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
+                  {t.bento.jpgPill}
+                </span>
+                <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
+                  Video → MP3
+                </span>
+                <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
+                  JSON ↔ CSV
+                </span>
+              </div>
             </div>
+
+            <Button
+              href="/tools/converter"
+              variant="outline"
+              size="md"
+              className="w-full justify-center font-semibold text-sm border-white/10 hover:border-amber-400/40"
+              rightIcon={<ArrowRight className="w-4 h-4 text-amber-400" />}
+            >
+              {t.bento.openConverter}
+            </Button>
+          </div>
+
+          {/* Card 4: PDF Tools Studio (6 Cols) */}
+          <div className="card-anim lg:col-span-6 clean-card p-5 sm:p-6 flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-3">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  {t.bento.pdfBadge}
+                </span>
+              </div>
+
+              <h3 className="text-lg font-bold text-white tracking-tight">
+                {t.bento.pdfTitle}
+              </h3>
+              <p className="text-sm text-slate-300 mt-1 mb-4 leading-relaxed font-normal">
+                {t.bento.pdfDesc}
+              </p>
+
+              {/* PDF Tool Pills */}
+              <div className="flex flex-wrap gap-1.5 mb-5 text-xs text-slate-300">
+                <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
+                  {t.bento.imgToPdfPill}
+                </span>
+                <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
+                  {t.bento.compressPdfPill}
+                </span>
+                <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
+                  {t.bento.protectPdfPill}
+                </span>
+                <span className="px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">
+                  PDF → Images
+                </span>
+              </div>
+            </div>
+
+            <Button
+              href="/tools/pdf"
+              variant="outline"
+              size="md"
+              className="w-full justify-center font-semibold text-sm border-white/10 hover:border-amber-400/40"
+              rightIcon={<ArrowRight className="w-4 h-4 text-amber-400" />}
+            >
+              {t.bento.openPdf}
+            </Button>
           </div>
         </div>
       </section>

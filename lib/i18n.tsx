@@ -10,6 +10,7 @@ export interface Translations {
     upscaler: string;
     downloader: string;
     converter: string;
+    pdfTools: string;
     info: string;
     version: string;
     toggleLangTitle: string;
@@ -44,6 +45,13 @@ export interface Translations {
     webpPill: string;
     pngPill: string;
     jpgPill: string;
+    pdfTitle: string;
+    pdfBadge: string;
+    pdfDesc: string;
+    openPdf: string;
+    imgToPdfPill: string;
+    compressPdfPill: string;
+    protectPdfPill: string;
   };
   telemetry: {
     sectionTitle: string;
@@ -217,6 +225,14 @@ export interface Translations {
       convertingAll: string;
       downloadAll: string;
     };
+    pdf: {
+      title: string;
+      badge: string;
+      desc: string;
+      catalogTitle: string;
+      searchPlaceholder: string;
+      closeStudio: string;
+    };
   };
 }
 
@@ -227,6 +243,7 @@ export const translations: Record<Language, Translations> = {
       upscaler: "AI Upscaler",
       downloader: "Downloader",
       converter: "Converter",
+      pdfTools: "PDF Tools",
       info: "Info",
       version: "v1.0",
       toggleLangTitle: "Ganti ke Bahasa Indonesia",
@@ -244,7 +261,7 @@ export const translations: Record<Language, Translations> = {
     },
     bento: {
       sectionTitle: "Core Utility Modules",
-      readyCount: "3 Active Modules",
+      readyCount: "4 Active Modules",
       upscaleTitle: "AI Image Upscaler",
       upscaleBadge: "2x / 4x HD",
       upscaleDesc:
@@ -265,6 +282,14 @@ export const translations: Record<Language, Translations> = {
       webpPill: "WebP (Ultra Light)",
       pngPill: "PNG (Lossless)",
       jpgPill: "JPG (Universal)",
+      pdfTitle: "PDF Tools Studio",
+      pdfBadge: "6 Tools • 100% Client-Side",
+      pdfDesc:
+        "Merge images to PDF, extract pages, compress file size, protect with AES-256 encryption, and convert text without server uploads.",
+      openPdf: "Launch PDF Studio",
+      imgToPdfPill: "Images → PDF (Batch)",
+      compressPdfPill: "Compress PDF",
+      protectPdfPill: "Protect & Unlock",
     },
     telemetry: {
       sectionTitle: "Platform Telemetry",
@@ -454,6 +479,14 @@ export const translations: Record<Language, Translations> = {
         convertingAll: "Converting All Files...",
         downloadAll: "Download All",
       },
+      pdf: {
+        title: "PDF Tools Studio",
+        badge: "100% Client-Side",
+        desc: "Comprehensive in-browser PDF utilities: Batch merge images to PDF, extract pages, compress size, encrypt with password, and convert text with total privacy.",
+        catalogTitle: "Complete PDF Tools Suite",
+        searchPlaceholder: "Search PDF tools... (e.g. compress, protect, extract)",
+        closeStudio: "Close Studio",
+      },
     },
   },
   id: {
@@ -462,6 +495,7 @@ export const translations: Record<Language, Translations> = {
       upscaler: "AI Upscaler",
       downloader: "Downloader",
       converter: "Converter",
+      pdfTools: "Alat PDF",
       info: "Info",
       version: "v1.0",
       toggleLangTitle: "Switch to English",
@@ -479,7 +513,7 @@ export const translations: Record<Language, Translations> = {
     },
     bento: {
       sectionTitle: "Modul Utilitas Utama",
-      readyCount: "3 Modul Siap Pakai",
+      readyCount: "4 Modul Siap Pakai",
       upscaleTitle: "AI Image Upscaler",
       upscaleBadge: "2x / 4x HD",
       upscaleDesc:
@@ -500,6 +534,14 @@ export const translations: Record<Language, Translations> = {
       webpPill: "WebP (Ringan)",
       pngPill: "PNG (Transparan)",
       jpgPill: "JPG (Universal)",
+      pdfTitle: "Studio Alat PDF",
+      pdfBadge: "6 Alat • 100% Client-Side",
+      pdfDesc:
+        "Gabung gambar ke PDF, ekstrak halaman, kompres ukuran, proteksi dengan enkripsi kata sandi, dan konversi teks tanpa kirim berkas ke server.",
+      openPdf: "Buka Studio PDF",
+      imgToPdfPill: "Gambar → PDF (Batch)",
+      compressPdfPill: "Kompres PDF",
+      protectPdfPill: "Kunci & Buka PDF",
     },
     telemetry: {
       sectionTitle: "Telemetri Platform",
@@ -689,6 +731,14 @@ export const translations: Record<Language, Translations> = {
         convertingAll: "Mengonversi Semua File...",
         downloadAll: "Unduh Semua",
       },
+      pdf: {
+        title: "Studio Alat PDF",
+        badge: "100% Client-Side",
+        desc: "Utilitas PDF lengkap di browser: Gabung batch gambar ke PDF, ekstrak halaman, kompres ukuran, proteksi dengan kata sandi, dan konversi teks dengan privasi penuh.",
+        catalogTitle: "Katalog Lengkap Alat PDF",
+        searchPlaceholder: "Cari alat PDF... (misal: kompres, protect, ekstrak)",
+        closeStudio: "Tutup Studio",
+      },
     },
   },
 };
@@ -707,7 +757,7 @@ const LanguageContext = createContext<LanguageContextType>({
   t: translations.en,
 });
 
-const LANG_STORAGE_KEY = "grainox_preferred_lang";
+const LANG_STORAGE_KEY = "grainox_lang_v3";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   // Default to English as requested
@@ -717,6 +767,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setIsMounted(true);
     try {
+      // Clear legacy storage if present
+      localStorage.removeItem("grainox_preferred_lang");
       const saved = localStorage.getItem(LANG_STORAGE_KEY) as Language | null;
       if (saved === "id" || saved === "en") {
         setLangState(saved);
