@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1080, height=1920, initial-scale=1.0">
+  <title>Grainox Video Promo (9:16 Vertical 1080x1920)</title>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <!-- GSAP & Icons -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: #030407;
+      color: #F3F4F6;
+      font-family: 'Inter', -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    /* Outer player toolbar for review & recording */
+    .toolbar {
+      width: 100%;
+      max-width: 540px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      background: #11151E;
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 10px 16px;
+      border-radius: 14px;
+      font-size: 13px;
+      color: #94A3B8;
+    }
+
+    .btn-control {
+      background: #F59E0B;
+      color: #090B10;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .btn-control:hover {
+      background: #FBBF24;
+      transform: scale(1.02);
+    }
+
+    .btn-rec {
+      background: #EF4444;
+      color: white;
+    }
+    .btn-rec:hover {
+      background: #DC2626;
+    }
+
+    /* The exact 9:16 Canvas (1080 x 1920) */
+    .video-viewport {
+      width: 540px;
+      height: 960px;
+      position: relative;
+      background: #090B10;
+      overflow: hidden;
+      border-radius: 28px;
+      box-shadow: 0 25px 80px rgba(0,0,0,0.8), 0 0 40px rgba(245, 158, 11, 0.12);
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      transform-origin: top center;
+    }
+
+    /* Scaling container for 1080x1920 internal coordinate space */
+    .render-canvas {
+      width: 1080px;
+      height: 1920px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: scale(0.5);
+      transform-origin: top left;
+      background: radial-gradient(circle at 50% 20%, #151A25 0%, #090B10 65%, #050608 100%);
+      overflow: hidden;
+    }
+
+    /* Ambient Glows */
+    .glow-amber {
+      position: absolute;
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(80px);
+    }
+
+    .glow-cyan {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(90px);
+    }
+
+    /* Top Progress Bar */
+    .story-progress {
+      position: absolute;
+      top: 24px;
+      left: 36px;
+      right: 36px;
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+
+    .progress-segment {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: #F59E0B;
+      border-radius: 99px;
+    }
+
+    /* Persistent Watermark Header */
+    .brand-header {
+      position: absolute;
+      top: 54px;
+      left: 0;
+      right: 0;
+      padding: 0 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 90;
+    }
+
+    .brand-logo-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: #11151E;
+      border: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    .brand-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #FFFFFF;
+    }
+
+    .brand-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      background: rgba(245, 158, 11, 0.15);
+      color: #F59E0B;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 4px 14px;
+      border-radius: 99px;
+      font-weight: 700;
+    }
+
+    /* Common Scene Structure */
+    .scene {
+      position: absolute;
+      inset: 0;
+      padding: 150px 54px 90px 54px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .scene.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    /* Typography & Badges */
+    .category-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 10px 24px;
+      border-radius: 99px;
+      font-size: 19px;
+      font-weight: 600;
+      color: #CBD5E1;
+      margin-bottom: 24px;
+    }
+
+    .pill-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #F59E0B;
+      box-shadow: 0 0 12px #F59E0B;
+    }
+
+    .hero-heading {
+      font-size: 58px;
+      line-height: 1.15;
+      font-weight: 900;
+      text-align: center;
+      color: #FFFFFF;
+      letter-spacing: -1.5px;
+      margin-bottom: 24px;
+    }
+
+    .hero-heading span.highlight {
+      background: linear-gradient(135deg, #F59E0B 0%, #FEF08A 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      font-size: 24px;
+      line-height: 1.5;
+      text-align: center;
+      color: #94A3B8;
+      max-width: 820px;
+      margin-bottom: 40px;
+    }
+
+    /* Realistic Grainox UI Cards */
+    .mock-window {
+      width: 100%;
+      background: #11151E;
+      border: 2px solid rgba(255, 255, 255, 0.14);
+      border-radius: 32px;
+      padding: 32px;
+      box-shadow: 0 35px 80px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255,255,255,0.1);
+      position: relative;
+    }
+
+    .border-glow-top {
+      position: absolute;
+      top: 0;
+      left: 15%;
+      right: 15%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #F59E0B, transparent);
+    }
+
+    /* Comparison Slider Simulation (Scene 2 - Upscaler) */
+    .compare-container {
+      width: 100%;
+      height: 480px;
+      border-radius: 24px;
+      overflow: hidden;
+      position: relative;
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      background: #080A0E;
+    }
+
+    .compare-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .compare-before {
+      filter: blur(8px) contrast(85%) brightness(90%);
+      clip-path: inset(0 50% 0 0);
+    }
+
+    .compare-after {
+      filter: contrast(105%) brightness(102%) drop-shadow(0 0 10px rgba(245, 158, 11, 0.2));
+    }
+
+    .compare-divider {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 4px;
+      background: #F59E0B;
+      box-shadow: 0 0 15px #F59E0B;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .divider-knob {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: #F59E0B;
+      color: #090B10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 20px;
+      box-shadow: 0 0 25px rgba(245,158,11,0.8);
+    }
+
+    .label-badge {
+      position: absolute;
+      padding: 8px 18px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      z-index: 20;
+      backdrop-filter: blur(10px);
+    }
+
+    .badge-left {
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #EF4444;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .badge-right {
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    /* Scene 3: Downloader UI & Live Video Preview */
+    .search-mock-bar {
+      display: flex;
+      align-items: center;
+      background: #161B26;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 20px;
+      padding: 8px 14px 8px 24px;
+      margin-bottom: 24px;
+      gap: 16px;
+    }
+
+    .search-input-text {
+      flex: 1;
+      font-size: 20px;
+      color: #FFFFFF;
+      font-family: 'JetBrains Mono', monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .fetch-btn {
+      background: #F59E0B;
+      color: #090B10;
+      font-weight: 800;
+      font-size: 19px;
+      padding: 14px 28px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .preview-card-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+      background: #0B0E14;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px;
+      padding: 24px;
+    }
+
+    .video-mock-box {
+      width: 100%;
+      height: 380px;
+      border-radius: 18px;
+      overflow: hidden;
+      position: relative;
+      background: #000;
+      border: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-mock-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .play-overlay-circle {
+      position: absolute;
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: rgba(245, 158, 11, 0.95);
+      color: #090B10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 35px rgba(245, 158, 11, 0.6);
+    }
+
+    /* Scene 4: Converter Batch Grid */
+    .converter-batch-card {
+      background: #0B0E14;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .format-chip {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 8px 18px;
+      border-radius: 10px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    /* Scene 5: Outro CTA */
+    .cta-big-card {
+      background: linear-gradient(180deg, #161C26 0%, #0F131A 100%);
+      border: 2px solid rgba(245, 158, 11, 0.4);
+      border-radius: 40px;
+      padding: 60px 48px;
+      text-align: center;
+      box-shadow: 0 30px 100px rgba(245, 158, 11, 0.2);
+      width: 100%;
+    }
+
+    .cta-button-main {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: #F59E0B;
+      color: #090B10;
+      font-size: 30px;
+      font-weight: 900;
+      padding: 24px 54px;
+      border-radius: 22px;
+      box-shadow: 0 15px 40px rgba(245, 158, 11, 0.4);
+      margin-top: 36px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Controls for Browser Playback & Video Recording -->
+  <div class="toolbar">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <button id="btnPlay" class="btn-control"><i data-lucide="play" style="width:16px;height:16px"></i> Play</button>
+      <button id="btnRestart" class="btn-control" style="background:#1E293B;color:#F3F4F6"><i data-lucide="rotate-ccw" style="width:16px;height:16px"></i> Replay</button>
+      <button id="btnRecord" class="btn-control btn-rec"><i data-lucide="video" style="width:16px;height:16px"></i> Record to WebM/MP4</button>
+    </div>
+    <span id="timecode" style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#F59E0B">00:00 / 00:20</span>
+  </div>
+
+  <!-- 9:16 Vertical Phone Shell Viewport -->
+  <div class="video-viewport">
+    <div class="render-canvas" id="canvas">
+
+      <!-- Top Story Progress Bar -->
+      <div class="story-progress">
+        <div class="progress-segment"><div class="progress-fill" id="p1"></div></div>
+        <div class="progress-segment"><div class="progress-fill" id="p2"></div></div>
+        <div class="progress-segment"><div class="progress-fill" id="p3"></div></div>
+        <div class="progress-segment"><div class="progress-fill" id="p4"></div></div>
+        <div class="progress-segment"><div class="progress-fill" id="p5"></div></div>
+      </div>
+
+      <!-- Persistent Brand Header -->
+      <div class="brand-header">
+        <div class="brand-logo-group">
+          <div class="brand-icon">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21 16-9 5-9-5V8l9-5 9 5v8Z"/>
+              <path d="M12 21V12"/>
+              <path d="M7 13.5 12 16l5-2.5"/>
+            </svg>
+          </div>
+          <span class="brand-title">Grainox</span>
+        </div>
+        <div class="brand-badge">grainox.vercel.app</div>
+      </div>
+
+      <!-- Dynamic Ambient Glows -->
+      <div class="glow-amber" style="top: 15%; left: 10%;"></div>
+      <div class="glow-cyan" style="bottom: 10%; right: 5%;"></div>
+
+      <!-- ================= SCENE 1: HOOK & INTRO (0s - 4s) ================= -->
+      <div class="scene active" id="scene1">
+        <div class="category-pill">
+          <span class="pill-dot"></span>
+          <span>Universal Web Utilities • 100% Free</span>
+        </div>
+        
+        <h1 class="hero-heading">
+          Satu Tempat Untuk<br>
+          <span class="highlight">Olah Media, AI Upscale</span><br>
+          & Konversi File.
+        </h1>
+
+        <p class="hero-desc">
+          Tingkatkan resolusi foto ke 4K, unduh media sosial tanpa watermark & iklan, serta konversi file batch instan tanpa risiko privasi.
+        </p>
+
+        <!-- Feature Pills Grid -->
+        <div style="display: flex; gap: 16px; margin-top: 10px;">
+          <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); padding: 14px 26px; border-radius: 16px; font-size: 20px; font-weight:700; color:#F59E0B; display:flex; align-items:center; gap:10px;">
+            <i data-lucide="shield-check" style="width:24px;height:24px;"></i> 100% Privat
+          </div>
+          <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); padding: 14px 26px; border-radius: 16px; font-size: 20px; font-weight:700; color:#38BDF8; display:flex; align-items:center; gap:10px;">
+            <i data-lucide="zap" style="width:24px;height:24px;"></i> Akselerasi GPU
+          </div>
+          <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); padding: 14px 26px; border-radius: 16px; font-size: 20px; font-weight:700; color:#10B981; display:flex; align-items:center; gap:10px;">
+            <i data-lucide="sparkles" style="width:24px;height:24px;"></i> Tanpa Login
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SCENE 2: AI IMAGE UPSCALER (4s - 8s) ================= -->
+      <div class="scene" id="scene2">
+        <div class="category-pill">
+          <span class="pill-dot"></span>
+          <span>Modul 01 • Super-Resolution Neural Network</span>
+        </div>
+
+        <h2 class="hero-heading" style="font-size: 52px; margin-bottom: 20px;">
+          Jernihkan Foto Buram<br>
+          Hingga <span class="highlight">4x Ultra HD (4K)</span>
+        </h2>
+
+        <div class="mock-window" style="margin-top: 10px;">
+          <div class="border-glow-top"></div>
+          
+          <div class="compare-container">
+            <!-- Low Res Blur Layer -->
+            <img class="compare-img compare-before" id="compBefore" src="https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1080&q=80" alt="Low Res">
+            <!-- High Res Crystal Clear Layer -->
+            <img class="compare-img compare-after" id="compAfter" src="https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1080&q=95" alt="Ultra HD">
+            
+            <div class="label-badge badge-left">240p (Buram)</div>
+            <div class="label-badge badge-right">4x HD (UltraSharp AI)</div>
+
+            <!-- Animated Interactive Slider Handle -->
+            <div class="compare-divider" id="compDivider">
+              <div class="divider-knob">⇄</div>
+            </div>
+          </div>
+
+          <!-- Model Chips -->
+          <div style="display:flex; justify-content:space-between; margin-top:24px; font-family:'JetBrains Mono',monospace; font-size:16px;">
+            <span style="color:#F59E0B">⚡ Model: UltraSharp 4K</span>
+            <span style="color:#94A3B8">Eksekusi GPU Lokal: ~1.2 Detik</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SCENE 3: UNIVERSAL DOWNLOADER (8s - 12s) ================= -->
+      <div class="scene" id="scene3">
+        <div class="category-pill">
+          <span class="pill-dot"></span>
+          <span>Modul 02 • Multi-Platform Stream Engine</span>
+        </div>
+
+        <h2 class="hero-heading" style="font-size: 50px; margin-bottom: 20px;">
+          Unduh Video & Audio<br>
+          <span class="highlight">+ Fitur Live Preview Langsung</span>
+        </h2>
+
+        <div class="mock-window">
+          <div class="border-glow-top"></div>
+
+          <!-- Search URL Mock -->
+          <div class="search-mock-bar">
+            <i data-lucide="link" style="width:24px;height:24px;color:#F59E0B;"></i>
+            <div class="search-input-text" id="typewriterUrl">https://www.tiktok.com/@creator/video/789...</div>
+            <div class="fetch-btn">
+              <i data-lucide="download" style="width:20px;height:20px;"></i>
+              <span>Fetch</span>
+            </div>
+          </div>
+
+          <!-- Preview & Formats Card -->
+          <div class="preview-card-grid">
+            <!-- Live Player Mock -->
+            <div class="video-mock-box">
+              <img src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&q=80" alt="Video Cover">
+              <div class="play-overlay-circle">
+                <i data-lucide="play" style="width:36px;height:36px;fill:#090B10;margin-left:4px;"></i>
+              </div>
+              <div style="position:absolute; bottom:12px; left:14px; background:rgba(0,0,0,0.8); padding:4px 12px; border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#F59E0B;">
+                ▶ In-Place Live Player
+              </div>
+            </div>
+
+            <!-- Single Clean Stream Option (No Duplicate!) -->
+            <div style="display:flex; flex-direction:column; justify-content:center; gap:16px;">
+              <div style="font-size:22px; font-weight:800; color:#FFFFFF; line-height:1.3;">
+                Viral Cinematic Video (Original Audio)
+              </div>
+              <div style="font-family:'JetBrains Mono',monospace; font-size:15px; color:#10B981; display:flex; align-items:center; gap:8px;">
+                <i data-lucide="check-circle-2" style="width:18px;height:18px;"></i> Siap Diunduh (Tanpa Watermark)
+              </div>
+
+              <!-- 1 Distinct HD Video Button -->
+              <div style="background:#161B26; border:1px solid rgba(245,158,11,0.4); padding:16px 20px; border-radius:16px; display:flex; align-items:center; justify-content:space-between;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <i data-lucide="video" style="color:#F59E0B;width:24px;height:24px;"></i>
+                  <span style="font-weight:700; font-size:18px;">Full HD 1080p (MP4)</span>
+                </div>
+                <div style="background:#F59E0B; color:#090B10; font-weight:800; font-size:14px; padding:6px 14px; border-radius:8px;">
+                  Unduh
+                </div>
+              </div>
+
+              <!-- Audio MP3 Button -->
+              <div style="background:#161B26; border:1px solid rgba(255,255,255,0.1); padding:16px 20px; border-radius:16px; display:flex; align-items:center; justify-content:space-between;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <i data-lucide="music" style="color:#38BDF8;width:24px;height:24px;"></i>
+                  <span style="font-weight:700; font-size:18px;">Audio MP3 (320kbps)</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.08); color:#FFFFFF; font-weight:700; font-size:14px; padding:6px 14px; border-radius:8px;">
+                  Unduh
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Supported Hubs -->
+          <div style="display:flex; gap:12px; margin-top:20px; justify-content:center; color:#94A3B8; font-size:15px; font-family:'JetBrains Mono',monospace;">
+            <span>TikTok</span> • <span>Instagram Reels</span> • <span>X / Twitter</span> • <span>Spotify</span> • <span>YouTube</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SCENE 4: UNIVERSAL CONVERTER (12s - 16s) ================= -->
+      <div class="scene" id="scene4">
+        <div class="category-pill">
+          <span class="pill-dot"></span>
+          <span>Modul 03 • Batch Client-Side Engine</span>
+        </div>
+
+        <h2 class="hero-heading" style="font-size: 52px; margin-bottom: 20px;">
+          Konversi Gambar Batch<br>
+          <span class="highlight">100% Cepat di Browser</span>
+        </h2>
+
+        <div class="mock-window">
+          <div class="border-glow-top"></div>
+
+          <!-- Batch Queue Items -->
+          <div class="converter-batch-card">
+            <div style="display:flex; align-items:center; gap:16px;">
+              <i data-lucide="file-image" style="width:32px;height:32px;color:#F59E0B;"></i>
+              <div>
+                <div style="font-weight:700; font-size:20px;">photo_landscape_01.png</div>
+                <div style="color:#94A3B8; font-size:15px; font-family:'JetBrains Mono',monospace;">4.8 MB → 680 KB (WebP)</div>
+              </div>
+            </div>
+            <div class="format-chip">Selesai (ZIP)</div>
+          </div>
+
+          <div class="converter-batch-card">
+            <div style="display:flex; align-items:center; gap:16px;">
+              <i data-lucide="file-image" style="width:32px;height:32px;color:#38BDF8;"></i>
+              <div>
+                <div style="font-weight:700; font-size:20px;">portrait_retouch_02.jpg</div>
+                <div style="color:#94A3B8; font-size:15px; font-family:'JetBrains Mono',monospace;">8.2 MB → 1.1 MB (WebP)</div>
+              </div>
+            </div>
+            <div class="format-chip">Selesai (ZIP)</div>
+          </div>
+
+          <!-- Feature stats -->
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; margin-top:28px; text-align:center;">
+            <div style="background:#0B0E14; padding:18px; border-radius:16px; border:1px solid rgba(255,255,255,0.08);">
+              <div style="font-size:28px; font-weight:800; color:#F59E0B;">~70%</div>
+              <div style="font-size:14px; color:#94A3B8; margin-top:4px;">Ukuran Dihemat</div>
+            </div>
+            <div style="background:#0B0E14; padding:18px; border-radius:16px; border:1px solid rgba(255,255,255,0.08);">
+              <div style="font-size:28px; font-weight:800; color:#10B981;">0.2 Detik</div>
+              <div style="font-size:14px; color:#94A3B8; margin-top:4px;">Kecepatan Batch</div>
+            </div>
+            <div style="background:#0B0E14; padding:18px; border-radius:16px; border:1px solid rgba(255,255,255,0.08);">
+              <div style="font-size:28px; font-weight:800; color:#38BDF8;">0 Log</div>
+              <div style="font-size:14px; color:#94A3B8; margin-top:4px;">Privat Mutlak</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ================= SCENE 5: OUTRO & CTA (16s - 20s) ================= -->
+      <div class="scene" id="scene5">
+        <div class="cta-big-card">
+          <div class="brand-icon" style="margin: 0 auto 24px auto; width:80px; height:80px;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21 16-9 5-9-5V8l9-5 9 5v8Z"/>
+              <path d="M12 21V12"/>
+              <path d="M7 13.5 12 16l5-2.5"/>
+            </svg>
+          </div>
+
+          <h2 style="font-size: 58px; font-weight: 900; line-height:1.15; margin-bottom:16px; color:#FFFFFF;">
+            Semua Utilitas Web.<br>
+            <span style="background: linear-gradient(135deg, #F59E0B 0%, #FEF08A 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+              Gratis & Tanpa Login.
+            </span>
+          </h2>
+
+          <p style="font-size: 22px; color: #94A3B8; max-width: 640px; margin: 0 auto;">
+            Akses langsung tanpa iklan pop-up, tanpa batasan langganan, dan dengan performa browser tercepat.
+          </p>
+
+          <div class="cta-button-main">
+            <span>grainox.vercel.app</span>
+            <i data-lucide="arrow-right" style="width:34px;height:34px;"></i>
+          </div>
+
+          <div style="margin-top: 36px; font-size: 18px; color: #64748B; font-family:'JetBrains Mono',monospace;">
+            Fast • 100% Free • Client-Side First
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Animation Timeline Controller -->
+  <script>
+    lucide.createIcons();
+
+    const TOTAL_DURATION = 20; // 20 seconds total
+    let tl = gsap.timeline({ paused: true, onUpdate: updateProgress });
+
+    // Scene elements
+    const s1 = document.getElementById("scene1");
+    const s2 = document.getElementById("scene2");
+    const s3 = document.getElementById("scene3");
+    const s4 = document.getElementById("scene4");
+    const s5 = document.getElementById("scene5");
+
+    const p1 = document.getElementById("p1");
+    const p2 = document.getElementById("p2");
+    const p3 = document.getElementById("p3");
+    const p4 = document.getElementById("p4");
+    const p5 = document.getElementById("p5");
+
+    const compDivider = document.getElementById("compDivider");
+    const compBefore = document.getElementById("compBefore");
+
+    // Construct Sequential Motion Timeline
+    tl
+      // --- SCENE 1 (0s - 4s) ---
+      .set(s1, { autoAlpha: 1, scale: 1 })
+      .from("#scene1 .category-pill", { y: -20, opacity: 0, duration: 0.6, ease: "power2.out" })
+      .from("#scene1 .hero-heading", { y: 30, opacity: 0, duration: 0.8, ease: "power2.out" }, "-=0.3")
+      .from("#scene1 .hero-desc", { y: 20, opacity: 0, duration: 0.7, ease: "power2.out" }, "-=0.4")
+      .from("#scene1 div[style*='display: flex'] > div", { scale: 0.85, opacity: 0, stagger: 0.15, duration: 0.6, ease: "back.out(1.5)" }, "-=0.3")
+      .to(p1, { width: "100%", duration: 4, ease: "none" }, 0)
+      .to(s1, { autoAlpha: 0, scale: 0.95, duration: 0.4, ease: "power2.in" }, 3.6)
+
+      // --- SCENE 2: UPSCALER (4s - 8s) ---
+      .set(s2, { autoAlpha: 1, scale: 1 }, 4)
+      .from("#scene2 .category-pill", { y: -20, opacity: 0, duration: 0.5, ease: "power2.out" }, 4)
+      .from("#scene2 .hero-heading", { y: 25, opacity: 0, duration: 0.6, ease: "power2.out" }, 4.2)
+      .from("#scene2 .mock-window", { y: 40, opacity: 0, duration: 0.7, ease: "power2.out" }, 4.3)
+      // Animate comparison slider across the image
+      .fromTo(compDivider, { left: "10%" }, { left: "85%", duration: 2.2, ease: "power2.inOut" }, 4.8)
+      .fromTo(compBefore, { clipPath: "inset(0 90% 0 0)" }, { clipPath: "inset(0 15% 0 0)", duration: 2.2, ease: "power2.inOut" }, 4.8)
+      .to(p2, { width: "100%", duration: 4, ease: "none" }, 4)
+      .to(s2, { autoAlpha: 0, scale: 0.95, duration: 0.4, ease: "power2.in" }, 7.6)
+
+      // --- SCENE 3: DOWNLOADER & LIVE PREVIEW (8s - 12s) ---
+      .set(s3, { autoAlpha: 1, scale: 1 }, 8)
+      .from("#scene3 .category-pill", { y: -20, opacity: 0, duration: 0.5, ease: "power2.out" }, 8)
+      .from("#scene3 .hero-heading", { y: 25, opacity: 0, duration: 0.6, ease: "power2.out" }, 8.2)
+      .from("#scene3 .mock-window", { y: 35, opacity: 0, duration: 0.7, ease: "power2.out" }, 8.3)
+      .from(".play-overlay-circle", { scale: 0, rotate: -45, duration: 0.6, ease: "back.out(2)" }, 9)
+      .from(".preview-card-grid > div:last-child > div", { x: 30, opacity: 0, stagger: 0.2, duration: 0.6, ease: "power2.out" }, 9.2)
+      .to(p3, { width: "100%", duration: 4, ease: "none" }, 8)
+      .to(s3, { autoAlpha: 0, scale: 0.95, duration: 0.4, ease: "power2.in" }, 11.6)
+
+      // --- SCENE 4: CONVERTER (12s - 16s) ---
+      .set(s4, { autoAlpha: 1, scale: 1 }, 12)
+      .from("#scene4 .category-pill", { y: -20, opacity: 0, duration: 0.5, ease: "power2.out" }, 12)
+      .from("#scene4 .hero-heading", { y: 25, opacity: 0, duration: 0.6, ease: "power2.out" }, 12.2)
+      .from("#scene4 .converter-batch-card", { x: -30, opacity: 0, stagger: 0.25, duration: 0.6, ease: "power2.out" }, 12.4)
+      .from("#scene4 div[style*='display:grid'] > div", { y: 20, opacity: 0, stagger: 0.15, duration: 0.5, ease: "back.out(1.5)" }, 13.2)
+      .to(p4, { width: "100%", duration: 4, ease: "none" }, 12)
+      .to(s4, { autoAlpha: 0, scale: 0.95, duration: 0.4, ease: "power2.in" }, 15.6)
+
+      // --- SCENE 5: OUTRO & CTA (16s - 20s) ---
+      .set(s5, { autoAlpha: 1, scale: 1 }, 16)
+      .from(".cta-big-card", { scale: 0.9, opacity: 0, y: 30, duration: 0.8, ease: "power2.out" }, 16.2)
+      .from(".cta-button-main", { scale: 0.85, opacity: 0, duration: 0.6, ease: "back.out(2)" }, 16.8)
+      .to(".cta-button-main", { scale: 1.05, repeat: 3, yoyo: true, duration: 0.4, ease: "power1.inOut" }, 17.5)
+      .to(p5, { width: "100%", duration: 4, ease: "none" }, 16);
+
+    function updateProgress() {
+      const cur = tl.time();
+      const mins = Math.floor(cur / 60);
+      const secs = Math.floor(cur % 60);
+      const str = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')} / 00:20`;
+      document.getElementById("timecode").innerText = str;
+    }
+
+    // Auto Play On Load
+    window.addEventListener("DOMContentLoaded", () => {
+      tl.play();
+    });
+
+    // Control Buttons
+    const btnPlay = document.getElementById("btnPlay");
+    btnPlay.addEventListener("click", () => {
+      if (tl.paused()) {
+        tl.play();
+        btnPlay.innerHTML = '<i data-lucide="pause" style="width:16px;height:16px"></i> Pause';
+      } else {
+        tl.pause();
+        btnPlay.innerHTML = '<i data-lucide="play" style="width:16px;height:16px"></i> Play';
+      }
+      lucide.createIcons();
+    });
+
+    document.getElementById("btnRestart").addEventListener("click", () => {
+      tl.restart();
+      btnPlay.innerHTML = '<i data-lucide="pause" style="width:16px;height:16px"></i> Pause';
+      lucide.createIcons();
+    });
+
+    // Client-side Direct Canvas Video Recorder to WebM/MP4
+    const btnRecord = document.getElementById("btnRecord");
+    let mediaRecorder = null;
+    let recordedChunks = [];
+
+    btnRecord.addEventListener("click", async () => {
+      btnRecord.innerText = "Recording (0-20s)...";
+      btnRecord.style.background = "#F59E0B";
+      tl.pause(0);
+
+      const canvasArea = document.querySelector(".render-canvas");
+      
+      // Use html2canvas or modern display capture / canvas stream
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: "browser" },
+          audio: false
+        });
+
+        mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9" });
+        recordedChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: "video/webm" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "grainox-promo-9x16.webm";
+          a.click();
+          btnRecord.innerHTML = '<i data-lucide="video" style="width:16px;height:16px"></i> Record to WebM/MP4';
+          lucide.createIcons();
+        };
+
+        mediaRecorder.start();
+        tl.restart();
+
+        setTimeout(() => {
+          mediaRecorder.stop();
+          stream.getTracks().forEach(track => track.stop());
+        }, 20500);
+
+      } catch (err) {
+        alert("Pilih jendela/tab ini saat browser meminta izin layar untuk merekam langsung ke video.");
+        btnRecord.innerHTML = '<i data-lucide="video" style="width:16px;height:16px"></i> Record to WebM/MP4';
+        lucide.createIcons();
+      }
+    });
+  </script>
+</body>
+</html>
