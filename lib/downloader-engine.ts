@@ -72,18 +72,18 @@ async function extractTikTok(url: string): Promise<any> {
       if (hasValidHd) {
         downloads.push({
           type: "video",
-          quality: "Full HD (1080p)",
+          quality: "Full HD Video",
           format: "mp4",
           url: d.hdplay.startsWith("http") ? d.hdplay : `https://www.tikwm.com${d.hdplay}`,
           size: `${(d.hd_size / (1024 * 1024)).toFixed(1)} MB`,
         });
       }
 
-      // 2. Normal Video (720p / HD)
+      // 2. Normal Video (Original / Watermark-free)
       if (d.play) {
         downloads.push({
           type: "video",
-          quality: hasValidHd ? "Standard (720p)" : "HD Video (No Watermark)",
+          quality: hasValidHd ? "Original Video" : "HD Video",
           format: "mp4",
           url: d.play.startsWith("http") ? d.play : `https://www.tikwm.com${d.play}`,
           size: d.size ? `${(d.size / (1024 * 1024)).toFixed(1)} MB` : undefined,
@@ -95,7 +95,7 @@ async function extractTikTok(url: string): Promise<any> {
         d.images.forEach((imgUrl: string, idx: number) => {
           downloads.push({
             type: "image",
-            quality: `Foto Slide #${idx + 1}`,
+            quality: d.images.length > 1 ? `Foto Slide #${idx + 1}` : "Foto HD",
             format: "jpg",
             url: imgUrl,
           });
@@ -838,13 +838,18 @@ export async function extractMedia(rawUrl: string): Promise<DownloaderResult> {
       } else if (type === "video") {
         quality = rawDownloads.length > 1 ? `Video #${videoIndex++}` : "Video HD";
       } else {
-        quality = "Audio MP3 (320kbps)";
+        quality = "Audio MP3";
       }
     } else if (quality.toLowerCase() === "320kbps") {
-      quality = "Audio MP3 (320kbps)";
+      quality = "Audio MP3";
     }
 
     const format = item.format || (type === "video" ? "mp4" : type === "audio" ? "mp3" : "jpg");
+
+    // Standardize & harmonize label nama button agar selalu serasi & logis
+    if (type === "audio") {
+      quality = "Audio MP3";
+    }
 
     // Deduplikasi button kembar: Cegah tombol dengan fungsi, tipe, dan kualitas yang sama persis
     const qualityKey = `${type}_${quality.toLowerCase().trim()}_${format.toLowerCase().trim()}`;

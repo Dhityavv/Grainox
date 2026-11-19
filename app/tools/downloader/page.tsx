@@ -191,18 +191,18 @@ export default function DownloaderPage() {
       </CleanLink>
 
       {/* Header Title */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
-          <Download className="w-6 h-6 text-amber-400 shrink-0" />
-          {t.tools.downloader.title}
+      <div className="space-y-1">
+        <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
+          <Download className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 shrink-0" />
+          <span>{t.tools.downloader.title}</span>
         </h1>
-        <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
+        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
           {t.tools.downloader.desc}
         </p>
       </div>
 
       {/* Input Box Card */}
-      <div className="rounded-2xl bg-[#11151D] border border-white/[0.1] p-4 sm:p-6 space-y-4 shadow-xl relative overflow-hidden">
+      <div className="rounded-2xl bg-[#11151D] border border-white/[0.1] p-3.5 sm:p-6 space-y-4 shadow-xl relative overflow-hidden">
         <BorderBeam size={280} duration={11} colorFrom="#F59E0B" colorTo="#FEF08A" />
         <form onSubmit={handleFetch} className="space-y-3.5">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center rounded-xl bg-[#161B26] border border-white/10 focus-within:border-amber-500/60 transition-all p-1.5 gap-2">
@@ -261,12 +261,12 @@ export default function DownloaderPage() {
 
         {/* Supported Platforms Chips */}
         <div className="space-y-2 pt-2 border-t border-white/[0.06]">
-          <span className="text-xs font-mono text-slate-300 block">{t.tools.downloader.supportedLabel}</span>
-          <div className="flex flex-wrap gap-2 text-xs font-mono">
+          <span className="text-[11px] sm:text-xs font-mono text-slate-400 block">{t.tools.downloader.supportedLabel}</span>
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-mono">
             {SUPPORTED_PLATFORMS.map((p) => (
               <span
                 key={p.name}
-                className={`px-2.5 py-1 rounded-md bg-white/[0.04] text-slate-300 border border-white/10 transition-colors ${p.color}`}
+                className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md bg-white/[0.04] text-slate-300 border border-white/10 transition-colors ${p.color}`}
               >
                 {p.name}
               </span>
@@ -277,9 +277,9 @@ export default function DownloaderPage() {
 
       {/* Result Card with In-Place Media Player Preview */}
       {downloadData && (
-        <div className="rounded-2xl bg-[#11151D] border border-white/[0.08] p-5 sm:p-6 flex flex-col md:flex-row gap-5 items-start shadow-2xl">
+        <div className="rounded-2xl bg-[#11151D] border border-white/[0.08] p-4 sm:p-6 flex flex-col md:flex-row gap-5 items-stretch md:items-start shadow-2xl">
           {/* Media Player / In-Place Preview Box */}
-          <div className="relative w-full md:w-56 lg:w-64 aspect-[9/12] sm:aspect-[9/14] md:h-64 rounded-2xl overflow-hidden bg-[#07090D] border border-white/15 shrink-0 shadow-2xl flex flex-col items-center justify-center group">
+          <div className="relative w-full md:w-56 lg:w-64 aspect-video sm:aspect-[9/12] md:aspect-[9/14] md:h-64 rounded-2xl overflow-hidden bg-[#07090D] border border-white/15 shrink-0 shadow-2xl flex flex-col items-center justify-center group">
             {isPlayingVideo && activeVideoUrl ? (
               <div className="relative w-full h-full flex items-center justify-center bg-black">
                 <video
@@ -336,10 +336,10 @@ export default function DownloaderPage() {
                     title={t.tools.downloader.watchVideo}
                     aria-label={t.tools.downloader.watchVideo}
                   >
-                    <div className="w-14 h-14 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-2xl shadow-amber-500/40 group-hover/btn:scale-110 transition-transform group-active/btn:scale-95 pl-1">
-                      <Play className="w-6 h-6 fill-slate-950" />
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-2xl shadow-amber-500/40 group-hover/btn:scale-110 transition-transform group-active/btn:scale-95 pl-1">
+                      <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-slate-950" />
                     </div>
-                    <span className="mt-2.5 px-3 py-1 rounded-full bg-black/80 text-[11px] font-mono font-bold text-white border border-white/15 backdrop-blur-md group-hover/btn:text-amber-400 transition-colors">
+                    <span className="mt-2 px-3 py-1 rounded-full bg-black/80 text-[11px] font-mono font-bold text-white border border-white/15 backdrop-blur-md group-hover/btn:text-amber-400 transition-colors">
                       {t.tools.downloader.watchVideo}
                     </span>
                   </button>
@@ -360,27 +360,27 @@ export default function DownloaderPage() {
           </div>
 
           {/* Details & Distinct Download Buttons */}
-          <div className="space-y-3.5 flex-1 w-full text-left">
+          <div className="space-y-3 flex-1 w-full text-left min-w-0">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1.5">
+                <span className="text-[11px] sm:text-xs font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5" /> {t.tools.downloader.readyBadge}
                 </span>
                 {downloadData.duration && (
-                  <span className="text-xs font-mono text-slate-300">{t.tools.downloader.durationLabel} {downloadData.duration}</span>
+                  <span className="text-[11px] sm:text-xs font-mono text-slate-400">{t.tools.downloader.durationLabel} {downloadData.duration}</span>
                 )}
               </div>
 
               <h3 className="font-bold text-white text-base sm:text-lg leading-snug line-clamp-2">
                 {downloadData.title}
               </h3>
-              <p className="text-xs text-slate-300 font-mono mt-0.5">{t.tools.downloader.creatorLabel} {downloadData.author}</p>
+              <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">{t.tools.downloader.creatorLabel} {downloadData.author}</p>
             </div>
 
-            {/* List of Available Downloads (Deduplicated with distinct qualities) */}
+            {/* List of Available Downloads */}
             <div className="space-y-2.5 pt-2 border-t border-white/[0.08]">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-slate-300 block">{t.tools.downloader.formatsLabel}</span>
+                <span className="text-xs font-mono text-slate-400 block">{t.tools.downloader.formatsLabel}</span>
                 {primaryVideo && (
                   <span className="text-[10px] font-mono text-amber-400/80">
                     {t.tools.downloader.previewReady}
@@ -388,40 +388,45 @@ export default function DownloaderPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
                 {downloadData.downloads.map((item, idx) => {
                   const isVideo = item.type === "video";
                   const isAudio = item.type === "audio";
                   const Icon = isVideo ? Video : isAudio ? Music : ImageIcon;
 
+                  // Clean display label based on item type and format
+                  const displayQuality = isAudio
+                    ? "MP3 Audio"
+                    : item.quality.replace(/\s*\(.*?\)/g, "").trim() || (isVideo ? "Video" : "Photo");
+
                   return (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-3 rounded-xl bg-[#161B26] hover:bg-[#1C2332] border border-white/10 hover:border-amber-500/40 text-left transition-all group"
+                      className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-[#161B26] hover:bg-[#1C2332] border border-white/10 hover:border-amber-500/40 text-left transition-all group"
                     >
                       <button
                         type="button"
                         onClick={() => handleDownloadFile(item)}
                         disabled={downloadingUrl === item.url}
-                        className="flex items-center gap-3 min-w-0 flex-1 text-left focus:outline-none"
+                        className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 text-left focus:outline-none"
                       >
-                        <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition-transform">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition-transform">
                           <Icon className="w-4 h-4" />
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors flex items-center gap-1.5">
-                            <span>{item.quality}</span>
-                            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/[0.08] text-slate-200">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors flex items-center gap-1.5 truncate">
+                            <span className="truncate">{displayQuality}</span>
+                            <span className="text-[9px] sm:text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/[0.08] text-slate-200 shrink-0">
                               {item.format}
                             </span>
                           </div>
                           {item.size && (
-                            <div className="text-xs text-slate-300 font-mono">{item.size}</div>
+                            <div className="text-[11px] text-slate-400 font-mono mt-0.5">{item.size}</div>
                           )}
                         </div>
                       </button>
 
-                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
                         {/* Play Preview Button for Video Stream */}
                         {isVideo && (
                           <button
@@ -430,7 +435,7 @@ export default function DownloaderPage() {
                               setActiveVideoUrl(item.url);
                               setIsPlayingVideo(true);
                             }}
-                            className="p-2 rounded-lg bg-white/[0.05] hover:bg-amber-500 hover:text-slate-950 text-slate-300 transition-colors"
+                            className="p-1.5 sm:p-2 rounded-lg bg-white/[0.05] hover:bg-amber-500 hover:text-slate-950 text-slate-300 transition-colors"
                             title={t.tools.downloader.watchVideo}
                             aria-label={t.tools.downloader.watchVideo}
                           >
