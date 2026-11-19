@@ -166,7 +166,7 @@ export default function InfoModal({ isOpen, onClose }: InfoModalProps) {
                 </div>
                 <div className="mt-3 flex justify-end">
                   <button
-                    onClick={() => openCleanUrl("https://github.com/issues")}
+                    onClick={() => openCleanUrl("https://github.com/Dhityavv/Grainox/issues")}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/10 text-slate-200 text-xs font-semibold border border-white/10 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                   >
                     <span>{t.infoModal.reportBtn}</span>
