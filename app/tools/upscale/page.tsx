@@ -23,7 +23,7 @@ import { recordToolUsage } from "@/lib/stats-service";
 import { useLanguage } from "@/lib/i18n";
 
 export default function UpscalePage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [scale, setScale] = useState<2 | 4>(4);
   const [selectedModel, setSelectedModel] = useState<"ultrasharp-4x" | "digital-art-4x" | "remacri-4x">("ultrasharp-4x");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -31,6 +31,13 @@ export default function UpscalePage() {
   const [hasResult, setHasResult] = useState(false);
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Switch confirmation state (when upscale already completed)
+  const [pendingSwitch, setPendingSwitch] = useState<{
+    type: "model" | "scale";
+    targetModel?: "ultrasharp-4x" | "digital-art-4x" | "remacri-4x";
+    targetScale?: 2 | 4;
+  } | null>(null);
 
   // Image states
   const [beforeImg, setBeforeImg] = useState<string | null>(null);
@@ -120,15 +127,18 @@ export default function UpscalePage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleStartUpscale = async () => {
+  const handleStartUpscale = async (
+    targetModel: "ultrasharp-4x" | "digital-art-4x" | "remacri-4x" = selectedModel,
+    targetScale: 2 | 4 = scale
+  ) => {
     if (!beforeImg) return;
     setIsProcessing(true);
     setIsDownloaded(false);
     setResultMeta(null);
-    setProgress({ percent: 1, stage: `Initializing ${selectedModel.toUpperCase()} Engine...` });
+    setProgress({ percent: 1, stage: `Initializing ${targetModel.toUpperCase()} Engine...` });
 
     try {
-      const res = await runAiUpscale(beforeImg, scale, selectedModel, (p) => setProgress(p));
+      const res = await runAiUpscale(beforeImg, targetScale, targetModel, (p) => setProgress(p));
       setAfterImg(res.dataUrl);
       setDownloadUrl(res.dataUrl);
       setResultMeta({
@@ -145,6 +155,51 @@ export default function UpscalePage() {
       setIsProcessing(false);
       setProgress(null);
     }
+  };
+
+  const requestModelChange = (modelId: "ultrasharp-4x" | "digital-art-4x" | "remacri-4x") => {
+    if (isProcessing || modelId === selectedModel) return;
+
+    if (hasResult) {
+      setPendingSwitch({
+        type: "model",
+        targetModel: modelId,
+      });
+    } else {
+      setSelectedModel(modelId);
+    }
+  };
+
+  const requestScaleChange = (scaleVal: 2 | 4) => {
+    if (isProcessing || scaleVal === scale) return;
+
+    if (hasResult) {
+      setPendingSwitch({
+        type: "scale",
+        targetScale: scaleVal,
+      });
+    } else {
+      setScale(scaleVal);
+    }
+  };
+
+  const confirmSwitch = () => {
+    if (!pendingSwitch) return;
+    if (pendingSwitch.type === "model" && pendingSwitch.targetModel) {
+      const nextModel = pendingSwitch.targetModel;
+      setSelectedModel(nextModel);
+      setPendingSwitch(null);
+      handleStartUpscale(nextModel, scale);
+    } else if (pendingSwitch.type === "scale" && pendingSwitch.targetScale) {
+      const nextScale = pendingSwitch.targetScale;
+      setScale(nextScale);
+      setPendingSwitch(null);
+      handleStartUpscale(selectedModel, nextScale);
+    }
+  };
+
+  const cancelSwitch = () => {
+    setPendingSwitch(null);
   };
 
   const currentModelObj = modelOptions.find((m) => m.id === selectedModel) || modelOptions[0];
@@ -240,29 +295,25 @@ export default function UpscalePage() {
               <span className="text-xs text-slate-400 px-2 font-medium">{t.tools.upscale.scaleLabel}</span>
               <button
                 type="button"
-                onClick={() => {
-                  setScale(2);
-                  setHasResult(false);
-                }}
+                disabled={isProcessing}
+                onClick={() => requestScaleChange(2)}
                 className={`chip-pop px-2.5 py-0.5 rounded-lg text-xs font-semibold transition-all ${
                   scale === 2
                     ? "bg-amber-500 text-slate-950 shadow-sm shadow-amber-500/20"
                     : "text-slate-300 hover:text-white hover:bg-white/5"
-                }`}
+                } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {t.tools.upscale.scale2x}
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setScale(4);
-                  setHasResult(false);
-                }}
+                disabled={isProcessing}
+                onClick={() => requestScaleChange(4)}
                 className={`chip-pop px-2.5 py-0.5 rounded-lg text-xs font-semibold transition-all ${
                   scale === 4
                     ? "bg-amber-500 text-slate-950 shadow-sm shadow-amber-500/20"
                     : "text-slate-300 hover:text-white hover:bg-white/5"
-                }`}
+                } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {t.tools.upscale.scale4x}
               </button>
@@ -277,15 +328,13 @@ export default function UpscalePage() {
                 <button
                   key={m.id}
                   type="button"
-                  onClick={() => {
-                    setSelectedModel(m.id);
-                    setHasResult(false);
-                  }}
+                  disabled={isProcessing}
+                  onClick={() => requestModelChange(m.id)}
                   className={`chip-pop text-left p-2.5 rounded-xl border transition-all relative ${
                     active
                       ? "border-amber-400 bg-amber-500/15 shadow-sm shadow-amber-500/20 ring-1 ring-amber-400/40 text-white"
                       : "border-white/[0.08] bg-[#0E1219] hover:border-white/20 hover:bg-[#141A24] text-slate-300"
-                  }`}
+                  } ${isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   <div className="flex items-center justify-between mb-0.5">
                     <span className={`text-xs font-mono font-bold ${active ? "text-amber-400" : "text-white"}`}>
@@ -297,9 +346,6 @@ export default function UpscalePage() {
                   </div>
                   <div className="text-[11px] font-semibold text-slate-200">
                     {m.tagline}
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5 leading-snug line-clamp-1">
-                    {m.desc}
                   </div>
                 </button>
               );
@@ -444,7 +490,7 @@ export default function UpscalePage() {
           )}
         </div>
 
-        {/* Action Controls Bar - Only show when an image is loaded (eliminates duplicate button) */}
+        {/* Action Controls Bar - Only show when an image is loaded */}
         {beforeImg && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1 animate-in fade-in duration-200">
             {isProcessing ? (
@@ -457,21 +503,21 @@ export default function UpscalePage() {
               >
                 {t.tools.upscale.processing}
               </Button>
-            ) : (
+            ) : !hasResult ? (
               <ShimmerButton
                 className="w-full sm:flex-1 h-11"
-                onClick={handleStartUpscale}
+                onClick={() => handleStartUpscale()}
                 leftIcon={<Zap className="w-4 h-4" />}
               >
                 {t.tools.upscale.btnStartProcessing} ({scale}x HD)
               </ShimmerButton>
-            )}
+            ) : null}
 
             {hasResult && downloadUrl && resultMeta && (
               <Button
                 variant="primary"
                 size="md"
-                className={`w-full sm:w-auto font-bold h-11 text-xs sm:text-sm shadow-lg transition-all ${
+                className={`w-full sm:flex-1 font-bold h-11 text-xs sm:text-sm shadow-lg transition-all ${
                   isDownloaded
                     ? "bg-emerald-400 hover:bg-emerald-300 text-slate-950 shadow-emerald-400/30 ring-2 ring-emerald-300"
                     : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20"
@@ -494,7 +540,9 @@ export default function UpscalePage() {
                 }
               >
                 {isDownloaded
-                  ? `Tersimpan! Unduh Ulang (${resultMeta.sizeMb} MB)`
+                  ? (lang === "id"
+                      ? `Tersimpan! Unduh Ulang (${resultMeta.sizeMb} MB)`
+                      : `Saved! Download Again (${resultMeta.sizeMb} MB)`)
                   : `${t.tools.upscale.btnDownload} (${resultMeta.sizeMb} MB)`}
               </Button>
             )}
@@ -502,6 +550,7 @@ export default function UpscalePage() {
             <Button
               variant="secondary"
               size="md"
+              disabled={isProcessing}
               className="w-full sm:w-auto justify-center h-11 text-xs text-slate-200 border-white/10 hover:border-amber-500/40"
               onClick={handleResetImage}
               leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
@@ -511,6 +560,57 @@ export default function UpscalePage() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal for Model/Scale Switch after Upscale */}
+      {pendingSwitch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-2xl bg-[#11151D] border border-amber-500/30 p-5 space-y-4 shadow-2xl relative text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 shrink-0">
+                <RefreshCw className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  {lang === "id" ? "Proses Ulang Foto?" : "Reprocess Image?"}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {lang === "id" ? "Pengaturan AI telah diubah" : "AI configuration changed"}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {pendingSwitch.type === "model"
+                ? lang === "id"
+                  ? `Mengganti ke model "${modelOptions.find((m) => m.id === pendingSwitch.targetModel)?.name}" akan memproses ulang foto ini. Lanjutkan?`
+                  : `Switching to model "${modelOptions.find((m) => m.id === pendingSwitch.targetModel)?.name}" will reprocess this image. Continue?`
+                : lang === "id"
+                  ? `Mengubah skala ke ${pendingSwitch.targetScale}x HD akan memproses ulang foto ini. Lanjutkan?`
+                  : `Changing scale to ${pendingSwitch.targetScale}x HD will reprocess this image. Continue?`}
+            </p>
+
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={cancelSwitch}
+                className="flex-1 justify-center h-9 text-xs border-white/10 text-slate-300 hover:text-white"
+              >
+                {lang === "id" ? "Batal" : "Cancel"}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={confirmSwitch}
+                className="flex-1 justify-center h-9 text-xs font-bold"
+                leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              >
+                {lang === "id" ? "Ya, Proses Ulang" : "Reprocess"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Real-time Tool Analytics Bar */}
       <ToolAnalyticsBar tool="upscale" />
