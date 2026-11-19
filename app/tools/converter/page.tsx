@@ -189,13 +189,6 @@ export default function ConverterPage({
     },
   ];
 
-  const quickPills = [
-    { label: isEn ? "⚡ Image Converter" : "⚡ Konverter Gambar", tool: "image-converter" as ToolId },
-    { label: isEn ? "🗜️ Compress Images" : "🗜️ Kompres Foto", tool: "compress-image" as ToolId },
-    { label: isEn ? "🎬 Video → MP3" : "🎬 Video → MP3", tool: "video-to-mp3" as ToolId },
-    { label: isEn ? "📊 JSON ↔ CSV" : "📊 JSON ↔ CSV", tool: "data-studio" as ToolId },
-    { label: isEn ? "📦 Create ZIP" : "📦 Buat ZIP", tool: "zip-studio" as ToolId },
-  ];
 
   const filteredTools = toolsList.filter((tool) => {
     const matchesCategory = activeCategory === "all" || tool.category === activeCategory;
@@ -407,26 +400,8 @@ export default function ConverterPage({
         </p>
       </div>
 
-      {/* Quick Action Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {quickPills.map((pill) => (
-          <button
-            key={pill.label}
-            type="button"
-            onClick={() => setActiveTool(pill.tool)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
-              activeTool === pill.tool
-                ? "bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-md shadow-amber-500/20"
-                : "bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border-white/10"
-            }`}
-          >
-            {pill.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Category Filter Tabs */}
-      <div className="flex items-center gap-1.5 bg-[#0B0E14] p-1.5 rounded-xl border border-white/[0.08] overflow-x-auto scrollbar-none">
+      {/* Unified Category & Menu Bar */}
+      <div className="flex items-center gap-1.5 bg-[#0B0E14] p-1.5 rounded-xl border border-white/[0.08] overflow-x-auto scrollbar-none shadow-inner">
         {categories.map((cat) => {
           const Icon = cat.icon;
           const active = activeCategory === cat.id;
@@ -441,10 +416,10 @@ export default function ConverterPage({
                   if (firstOfCat) setActiveTool(firstOfCat.id);
                 }
               }}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
                 active
-                  ? "bg-[#1A212E] text-amber-400 border border-amber-500/30 shadow-sm"
-                  : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                  ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20 border border-amber-400"
+                  : "text-slate-400 hover:text-white hover:bg-white/[0.05]"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -460,13 +435,42 @@ export default function ConverterPage({
           <BorderBeam size={320} duration={12} colorFrom="#F59E0B" colorTo="#34D399" />
 
           {/* Active Tool Title Header */}
-          <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-white/10">
             <div className="flex items-center gap-2.5">
-              <Sparkles className="w-4 h-4 text-amber-400" />
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
               <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
                 {toolsList.find((t) => t.id === activeTool)?.name}
               </h2>
             </div>
+
+            {/* Sub-tabs if Image Studio has multiple tools */}
+            {(activeTool === "image-converter" || activeTool === "compress-image") && (
+              <div className="flex items-center gap-1.5 bg-[#0B0E14] p-1 rounded-lg border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setActiveTool("image-converter")}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                    activeTool === "image-converter"
+                      ? "bg-amber-500 text-slate-950 font-bold shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {isEn ? "Format Converter" : "Konverter Format"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTool("compress-image")}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                    activeTool === "compress-image"
+                      ? "bg-amber-500 text-slate-950 font-bold shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {isEn ? "Compress Images" : "Kompres Foto"}
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => setActiveTool(null)}
