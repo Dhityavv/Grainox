@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPlatformStatsAsync, incrementPlatformStatsAsync } from "@/lib/server-stats";
+import { getPlatformStatsAsync, incrementPlatformStatsAsync, readPlatformStats } from "@/lib/server-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -12,16 +12,13 @@ export async function GET() {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        upscaleCount: 0,
-        downloadCount: 8,
-        convertCount: 0,
-        totalSavedMb: 20,
-        lastUpdated: Date.now(),
+    const fallback = readPlatformStats();
+    return NextResponse.json(fallback, {
+      status: 200,
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       },
-      { status: 200 }
-    );
+    });
   }
 }
 

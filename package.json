@@ -12,6 +12,7 @@
     "@coflyn/scrapr": "^1.4.0",
     "@tensorflow/tfjs": "^4.11.0",
     "@upscalerjs/esrgan-slim": "^1.0.0",
+    "@vercel/blob": "^2.9.0",
     "btch-downloader": "^6.4.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.11.17",
