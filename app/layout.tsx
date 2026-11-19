@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "./client-layout";
@@ -15,9 +15,19 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#090B10",
+};
+
 export const metadata: Metadata = {
   title: "Grainox — Universal Web Toolkit",
-  description: "AI Image Upscaler, Social Media Downloader, Universal File Converter. Fast, client-side first, no signup required.",
+  description: "AI Image Upscaler, Social Media Downloader, Universal File Converter, and Client-Side PDF Tools. Fast, client-side first, no signup required.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Grainox",
+  },
   icons: {
     icon: [
       { url: "/grainox-icon.png", type: "image/png" },

@@ -25,6 +25,8 @@ import Button from "@/components/ui/Button";
 import ShimmerButton from "@/components/ui/ShimmerButton";
 import BorderBeam from "@/components/ui/BorderBeam";
 import ToolAnalyticsBar from "@/components/analytics/ToolAnalyticsBar";
+import DropZone from "@/components/ui/DropZone";
+import { playSuccessSound } from "@/lib/sound-effects";
 import { recordToolUsage } from "@/lib/stats-service";
 import { useLanguage } from "@/lib/i18n";
 import {
@@ -110,6 +112,7 @@ export default function PdfToolsPage() {
   };
 
   const triggerDownload = (url: string, filename: string, downloadId: string) => {
+    playSuccessSound();
     setDownloadedSet((prev) => new Set(prev).add(downloadId));
     const a = document.createElement("a");
     a.href = url;
@@ -406,32 +409,18 @@ export default function PdfToolsPage() {
                   : "Pilih atau drag beberapa gambar (JPG, PNG, WebP) untuk digabungkan menjadi dokumen PDF."}
               </p>
 
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                className="hidden"
+              <DropZone
                 id="img-to-pdf-input"
-                onChange={(e) => {
-                  if (e.target.files) {
-                    setImgPdfFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
-                    setImgPdfResultUrl(null);
-                  }
+                accept="image/*"
+                multiple
+                icon={FilePlus}
+                title={isEn ? "Click or Drag & Drop Images (Batch Supported)" : "Klik atau Drag & Drop Gambar (Bisa Batch Banyak)"}
+                subtitle="Mendukung JPG, PNG, WebP, GIF, BMP"
+                onFilesSelected={(files) => {
+                  setImgPdfFiles((prev) => [...prev, ...files]);
+                  setImgPdfResultUrl(null);
                 }}
               />
-
-              <label
-                htmlFor="img-to-pdf-input"
-                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/15 rounded-xl hover:border-amber-500/50 bg-[#161B26] hover:bg-[#1C2332] transition-all cursor-pointer text-center group"
-              >
-                <FilePlus className="w-8 h-8 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
-                <div className="text-xs font-semibold text-white">
-                  {isEn ? "Click to Select Images (Batch Supported)" : "Klik untuk Memilih Gambar (Bisa Batch Banyak)"}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  JPG, PNG, WebP, GIF, BMP
-                </div>
-              </label>
 
               {imgPdfFiles.length > 0 && (
                 <div className="space-y-3">
@@ -523,35 +512,32 @@ export default function PdfToolsPage() {
                   : "Unggah file PDF untuk mengekstrak setiap halaman menjadi file gambar PNG berkualitas tinggi."}
               </p>
 
-              <input
-                type="file"
-                accept="application/pdf"
-                className="hidden"
+              <DropZone
                 id="pdf-to-img-input"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    setPdfToImgFile(e.target.files[0]);
+                accept="application/pdf"
+                icon={Upload}
+                title={
+                  pdfToImgFile
+                    ? pdfToImgFile.name
+                    : isEn
+                    ? "Click or Drag & Drop PDF Document"
+                    : "Pilih atau Drag & Drop File PDF"
+                }
+                subtitle={
+                  pdfToImgFile
+                    ? formatBytes(pdfToImgFile.size)
+                    : isEn
+                    ? "Extract all pages to crisp high-res PNG images"
+                    : "Ekstrak semua halaman menjadi gambar tajam"
+                }
+                badge={pdfToImgFile ? "PDF Selected" : undefined}
+                onFilesSelected={(files) => {
+                  if (files[0]) {
+                    setPdfToImgFile(files[0]);
                     setPdfPages([]);
                   }
                 }}
               />
-
-              <label
-                htmlFor="pdf-to-img-input"
-                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/15 rounded-xl hover:border-amber-500/50 bg-[#161B26] hover:bg-[#1C2332] transition-all cursor-pointer text-center group"
-              >
-                <Upload className="w-8 h-8 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
-                <div className="text-xs font-semibold text-white">
-                  {pdfToImgFile
-                    ? pdfToImgFile.name
-                    : isEn
-                    ? "Choose or Drop PDF File"
-                    : "Pilih File PDF Dokumen"}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  {pdfToImgFile ? formatBytes(pdfToImgFile.size) : isEn ? "Extract all pages" : "Ekstrak semua halaman"}
-                </div>
-              </label>
 
               {pdfToImgFile && (
                 <div className="flex items-center gap-3">
@@ -630,35 +616,32 @@ export default function PdfToolsPage() {
                   : "Kecilkan ukuran file dokumen PDF langsung di browser Anda. Pilih level kompresi sesuai kebutuhan."}
               </p>
 
-              <input
-                type="file"
-                accept="application/pdf"
-                className="hidden"
+              <DropZone
                 id="compress-pdf-input"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    setCompressPdfFile(e.target.files[0]);
+                accept="application/pdf"
+                icon={Sliders}
+                title={
+                  compressPdfFile
+                    ? compressPdfFile.name
+                    : isEn
+                    ? "Click or Drag & Drop PDF Document"
+                    : "Pilih atau Drag & Drop File PDF"
+                }
+                subtitle={
+                  compressPdfFile
+                    ? formatBytes(compressPdfFile.size)
+                    : isEn
+                    ? "Supports scan, text, and large PDF files"
+                    : "Mendukung dokumen scan dan teks"
+                }
+                badge={compressPdfFile ? "PDF Selected" : undefined}
+                onFilesSelected={(files) => {
+                  if (files[0]) {
+                    setCompressPdfFile(files[0]);
                     setCompressPdfResult(null);
                   }
                 }}
               />
-
-              <label
-                htmlFor="compress-pdf-input"
-                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/15 rounded-xl hover:border-amber-500/50 bg-[#161B26] hover:bg-[#1C2332] transition-all cursor-pointer text-center group"
-              >
-                <Sliders className="w-8 h-8 text-emerald-400 mb-2 group-hover:scale-110 transition-transform" />
-                <div className="text-xs font-semibold text-white">
-                  {compressPdfFile
-                    ? compressPdfFile.name
-                    : isEn
-                    ? "Select PDF Document to Compress"
-                    : "Pilih File PDF untuk Dikompres"}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  {compressPdfFile ? formatBytes(compressPdfFile.size) : isEn ? "Supports scan, text, and large PDFs" : "Mendukung dokumen scan dan teks"}
-                </div>
-              </label>
 
               {compressPdfFile && (
                 <div className="space-y-4 p-4 rounded-xl bg-[#141A24] border border-white/10">
@@ -767,36 +750,29 @@ export default function PdfToolsPage() {
                   : "Kunci dokumen PDF Anda dengan enkripsi kata sandi standar AES-256 yang aman."}
               </p>
 
-              <input
-                type="file"
-                accept="application/pdf"
-                className="hidden"
+              <DropZone
                 id="protect-pdf-input"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    setProtectFile(e.target.files[0]);
+                accept="application/pdf"
+                icon={Lock}
+                title={
+                  protectFile
+                    ? protectFile.name
+                    : isEn
+                    ? "Click or Drag & Drop PDF to Encrypt"
+                    : "Pilih atau Drag & Drop File PDF untuk Diproteksi"
+                }
+                subtitle={
+                  protectFile ? formatBytes(protectFile.size) : "Standard AES-256 Military Encryption"
+                }
+                badge={protectFile ? "PDF Selected" : undefined}
+                onFilesSelected={(files) => {
+                  if (files[0]) {
+                    setProtectFile(files[0]);
                     setProtectResultUrl(null);
                     setProtectError("");
                   }
                 }}
               />
-
-              <label
-                htmlFor="protect-pdf-input"
-                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/15 rounded-xl hover:border-amber-500/50 bg-[#161B26] hover:bg-[#1C2332] transition-all cursor-pointer text-center group"
-              >
-                <Lock className="w-8 h-8 text-rose-400 mb-2 group-hover:scale-110 transition-transform" />
-                <div className="text-xs font-semibold text-white">
-                  {protectFile
-                    ? protectFile.name
-                    : isEn
-                    ? "Choose PDF File to Encrypt"
-                    : "Pilih File PDF untuk Diproteksi"}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  {protectFile ? formatBytes(protectFile.size) : "Standard AES-256"}
-                </div>
-              </label>
 
               {protectFile && (
                 <div className="space-y-3 p-4 rounded-xl bg-[#141A24] border border-white/10">
@@ -870,36 +846,29 @@ export default function PdfToolsPage() {
                   : "Hilangkan proteksi password dari file PDF resmi agar mudah dibuka kapan saja."}
               </p>
 
-              <input
-                type="file"
-                accept="application/pdf"
-                className="hidden"
+              <DropZone
                 id="unlock-pdf-input"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    setUnlockFile(e.target.files[0]);
+                accept="application/pdf"
+                icon={Unlock}
+                title={
+                  unlockFile
+                    ? unlockFile.name
+                    : isEn
+                    ? "Click or Drag & Drop Password-Protected PDF"
+                    : "Pilih atau Drag & Drop File PDF yang Terkunci"
+                }
+                subtitle={
+                  unlockFile ? formatBytes(unlockFile.size) : isEn ? "Requires valid password to decrypt" : "Perlu password untuk dekripsi"
+                }
+                badge={unlockFile ? "PDF Selected" : undefined}
+                onFilesSelected={(files) => {
+                  if (files[0]) {
+                    setUnlockFile(files[0]);
                     setUnlockResultUrl(null);
                     setUnlockError("");
                   }
                 }}
               />
-
-              <label
-                htmlFor="unlock-pdf-input"
-                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/15 rounded-xl hover:border-amber-500/50 bg-[#161B26] hover:bg-[#1C2332] transition-all cursor-pointer text-center group"
-              >
-                <Unlock className="w-8 h-8 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
-                <div className="text-xs font-semibold text-white">
-                  {unlockFile
-                    ? unlockFile.name
-                    : isEn
-                    ? "Choose Password-Protected PDF"
-                    : "Pilih File PDF yang Terkunci"}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  {unlockFile ? formatBytes(unlockFile.size) : isEn ? "Requires valid password" : "Perlu password untuk dekripsi"}
-                </div>
-              </label>
 
               {unlockFile && (
                 <div className="space-y-3 p-4 rounded-xl bg-[#141A24] border border-white/10">

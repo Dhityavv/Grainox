@@ -1,0 +1,30 @@
+{
+  "name": "Grainox — Universal Web Toolkit",
+  "short_name": "Grainox",
+  "description": "AI Image Upscaler, Universal Media Downloader, and Client-Side File & PDF Studio.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090B10",
+  "theme_color": "#090B10",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/grainox-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/grainox-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "utilities",
+    "productivity",
+    "photo"
+  ]
+}

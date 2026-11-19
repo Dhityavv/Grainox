@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import Button from "@/components/ui/Button";
+import RetroGrid from "@/components/ui/RetroGrid";
 import GlobalAnalyticsDashboard from "@/components/analytics/GlobalAnalyticsDashboard";
 import { useLanguage } from "@/lib/i18n";
 
@@ -50,8 +51,9 @@ export default function HomePage() {
       ref={containerRef}
       className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-20 space-y-12"
     >
-      {/* Hero Section */}
+      {/* Hero Section with 21st.dev Ambient Perspective Grid */}
       <section className="relative text-center max-w-2xl mx-auto pt-8 pb-4 flex flex-col items-center">
+        <RetroGrid className="opacity-20" />
         {/* Soft Ambient Glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/3 w-[450px] h-[200px] bg-amber-500/[0.08] blur-[100px] rounded-full pointer-events-none -z-10" />
 

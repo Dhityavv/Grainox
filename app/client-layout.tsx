@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import InfoModal from "@/components/InfoModal";
 import CommandPalette from "@/components/CommandPalette";
+import PwaManager from "@/components/pwa/PwaManager";
 import { LanguageProvider } from "@/lib/i18n";
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <Footer />
         <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} />
         <CommandPalette isOpen={commandOpen} onClose={() => setCommandOpen(false)} />
+        <PwaManager />
       </div>
     </LanguageProvider>
   );

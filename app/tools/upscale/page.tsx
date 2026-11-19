@@ -21,6 +21,12 @@ import ToolAnalyticsBar from "@/components/analytics/ToolAnalyticsBar";
 import { runAiUpscale, type UpscaleProgress } from "@/lib/ai-upscaler";
 import { recordToolUsage } from "@/lib/stats-service";
 import { useLanguage } from "@/lib/i18n";
+import {
+  playDragHoverSound,
+  playDropSound,
+  playSuccessSound,
+  playClickSound,
+} from "@/lib/sound-effects";
 
 export default function UpscalePage() {
   const { t } = useLanguage();
@@ -75,6 +81,7 @@ export default function UpscalePage() {
 
   const handleProcessFile = (file: File) => {
     if (!file.type.startsWith("image/")) return;
+    playDropSound();
 
     setImageName(file.name);
     setImageSizeKb((file.size / 1024).toFixed(1));
@@ -138,6 +145,7 @@ export default function UpscalePage() {
         engine: res.method,
       });
       setHasResult(true);
+      playSuccessSound();
       recordToolUsage("upscale");
     } catch (err) {
       console.error("Upscale failed:", err);
@@ -206,7 +214,10 @@ export default function UpscalePage() {
       <div
         onDragOver={(e) => {
           e.preventDefault();
-          setIsDragging(true);
+          if (!isDragging) {
+            setIsDragging(true);
+            playDragHoverSound();
+          }
         }}
         onDragLeave={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node)) {
@@ -442,82 +453,73 @@ export default function UpscalePage() {
           )}
         </div>
 
-        {/* Action Controls Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
-          {!beforeImg ? (
-            <ShimmerButton
-              className="w-full h-11"
-              onClick={() => fileInputRef.current?.click()}
-              leftIcon={<Upload className="w-4 h-4" />}
-            >
-              {t.tools.upscale.btnPickComputer}
-            </ShimmerButton>
-          ) : (
-            <>
-              {isProcessing ? (
-                <Button
-                  variant="primary"
-                  size="md"
-                  className="w-full sm:flex-1 justify-center h-11 text-xs sm:text-sm font-bold shadow-lg shadow-amber-500/20"
-                  isLoading={true}
-                  leftIcon={<Zap className="w-4 h-4" />}
-                >
-                  {t.tools.upscale.processing}
-                </Button>
-              ) : (
-                <ShimmerButton
-                  className="w-full sm:flex-1 h-11"
-                  onClick={handleStartUpscale}
-                  leftIcon={<Zap className="w-4 h-4" />}
-                >
-                  {t.tools.upscale.btnStartProcessing} ({scale}x HD)
-                </ShimmerButton>
-              )}
-
-              {hasResult && downloadUrl && resultMeta && (
-                <Button
-                  variant="primary"
-                  size="md"
-                  className={`w-full sm:w-auto font-bold h-11 text-xs sm:text-sm shadow-lg transition-all ${
-                    isDownloaded
-                      ? "bg-emerald-400 hover:bg-emerald-300 text-slate-950 shadow-emerald-400/30 ring-2 ring-emerald-300"
-                      : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20"
-                  }`}
-                  onClick={() => {
-                    setIsDownloaded(true);
-                    const a = document.createElement("a");
-                    a.href = downloadUrl;
-                    a.download = `grainox-upscaled-${scale}x-${resultMeta.width}x${resultMeta.height}.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                  }}
-                  leftIcon={
-                    isDownloaded ? (
-                      <CheckCircle2 className="w-4 h-4 text-slate-950 stroke-[2.5]" />
-                    ) : (
-                      <Download className="w-4 h-4" />
-                    )
-                  }
-                >
-                  {isDownloaded
-                    ? `Tersimpan! Unduh Ulang (${resultMeta.sizeMb} MB)`
-                    : `${t.tools.upscale.btnDownload} (${resultMeta.sizeMb} MB)`}
-                </Button>
-              )}
-
+        {/* Action Controls Bar - Only show when an image is loaded (eliminates duplicate button) */}
+        {beforeImg && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1 animate-in fade-in duration-200">
+            {isProcessing ? (
               <Button
-                variant="secondary"
+                variant="primary"
                 size="md"
-                className="w-full sm:w-auto justify-center h-11 text-xs text-slate-200 border-white/10 hover:border-amber-500/40"
-                onClick={handleResetImage}
-                leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+                className="w-full sm:flex-1 justify-center h-11 text-xs sm:text-sm font-bold shadow-lg shadow-amber-500/20"
+                isLoading={true}
+                leftIcon={<Zap className="w-4 h-4" />}
               >
-                {t.tools.upscale.changePhoto}
+                {t.tools.upscale.processing}
               </Button>
-            </>
-          )}
-        </div>
+            ) : (
+              <ShimmerButton
+                className="w-full sm:flex-1 h-11"
+                onClick={handleStartUpscale}
+                leftIcon={<Zap className="w-4 h-4" />}
+              >
+                {t.tools.upscale.btnStartProcessing} ({scale}x HD)
+              </ShimmerButton>
+            )}
+
+            {hasResult && downloadUrl && resultMeta && (
+              <Button
+                variant="primary"
+                size="md"
+                className={`w-full sm:w-auto font-bold h-11 text-xs sm:text-sm shadow-lg transition-all ${
+                  isDownloaded
+                    ? "bg-emerald-400 hover:bg-emerald-300 text-slate-950 shadow-emerald-400/30 ring-2 ring-emerald-300"
+                    : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20"
+                }`}
+                onClick={() => {
+                  playSuccessSound();
+                  setIsDownloaded(true);
+                  const a = document.createElement("a");
+                  a.href = downloadUrl;
+                  a.download = `grainox-upscaled-${scale}x-${resultMeta.width}x${resultMeta.height}.png`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                }}
+                leftIcon={
+                  isDownloaded ? (
+                    <CheckCircle2 className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )
+                }
+              >
+                {isDownloaded
+                  ? `Tersimpan! Unduh Ulang (${resultMeta.sizeMb} MB)`
+                  : `${t.tools.upscale.btnDownload} (${resultMeta.sizeMb} MB)`}
+              </Button>
+            )}
+
+            <Button
+              variant="secondary"
+              size="md"
+              className="w-full sm:w-auto justify-center h-11 text-xs text-slate-200 border-white/10 hover:border-amber-500/40"
+              onClick={handleResetImage}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+            >
+              {t.tools.upscale.changePhoto}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Real-time Tool Analytics Bar */}

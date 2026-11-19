@@ -27,6 +27,8 @@ import Button from "@/components/ui/Button";
 import ShimmerButton from "@/components/ui/ShimmerButton";
 import BorderBeam from "@/components/ui/BorderBeam";
 import ToolAnalyticsBar from "@/components/analytics/ToolAnalyticsBar";
+import DropZone from "@/components/ui/DropZone";
+import { playSuccessSound } from "@/lib/sound-effects";
 import { recordToolUsage } from "@/lib/stats-service";
 import { useLanguage } from "@/lib/i18n";
 import {
@@ -206,6 +208,7 @@ export default function ConverterPage({
   });
 
   const triggerDownload = (url: string, filename: string, downloadId: string) => {
+    playSuccessSound();
     setDownloadedSet((prev) => new Set(prev).add(downloadId));
     const a = document.createElement("a");
     a.href = url;
@@ -528,38 +531,27 @@ export default function ConverterPage({
               </div>
 
               {/* Upload Drop Box */}
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                className="hidden"
+              <DropZone
                 id="compress-img-input"
-                onChange={(e) => {
-                  if (e.target.files) {
-                    setCompressImgFiles(Array.from(e.target.files));
-                    setCompressImgResults([]);
-                  }
-                }}
-              />
-
-              <label
-                htmlFor="compress-img-input"
-                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/15 rounded-xl hover:border-amber-500/50 bg-[#161B26] hover:bg-[#1C2332] transition-all cursor-pointer text-center group"
-              >
-                <Sliders className="w-8 h-8 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
-                <div className="text-xs font-semibold text-white">
-                  {compressImgFiles.length > 0
+                accept="image/*"
+                multiple
+                icon={Sliders}
+                title={
+                  compressImgFiles.length > 0
                     ? isEn
                       ? `${compressImgFiles.length} photos selected`
                       : `${compressImgFiles.length} foto dipilih`
                     : isEn
-                    ? "Select Photos / Images to Compress (Batch Supported)"
-                    : "Pilih Foto / Gambar untuk Dikompres (Bisa Batch Banyak)"}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  JPG, PNG, WebP, GIF, BMP • 100% on-device
-                </div>
-              </label>
+                    ? "Click or Drag & Drop Photos to Compress (Batch Supported)"
+                    : "Pilih atau Drag & Drop Foto untuk Dikompres (Bisa Batch Banyak)"
+                }
+                subtitle="JPG, PNG, WebP, GIF, BMP • 100% on-device privacy"
+                badge={compressImgFiles.length > 0 ? `${compressImgFiles.length} Files` : undefined}
+                onFilesSelected={(files) => {
+                  setCompressImgFiles(files);
+                  setCompressImgResults([]);
+                }}
+              />
 
               {compressImgFiles.length > 0 && (
                 <div className="flex items-center gap-3 pt-2">
@@ -689,37 +681,23 @@ export default function ConverterPage({
                 </div>
               </div>
 
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                className="hidden"
+              <DropZone
                 id="img-batch-input"
-                onChange={(e) => {
-                  if (e.target.files) {
-                    const newItems = Array.from(e.target.files).map((f) => ({
-                      id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-                      file: f,
-                      preview: URL.createObjectURL(f),
-                      status: "pending",
-                    }));
-                    setImageBatch((prev) => [...prev, ...newItems]);
-                  }
+                accept="image/*"
+                multiple
+                icon={FilePlus}
+                title={isEn ? "Click or Drag & Drop Images for Batch Conversion" : "Klik atau Drag & Drop Gambar untuk Konversi Batch"}
+                subtitle="PNG, JPG, WebP, GIF, SVG, BMP, AVIF • Batch conversion"
+                onFilesSelected={(files) => {
+                  const newItems = files.map((f) => ({
+                    id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+                    file: f,
+                    preview: URL.createObjectURL(f),
+                    status: "pending",
+                  }));
+                  setImageBatch((prev) => [...prev, ...newItems]);
                 }}
               />
-
-              <label
-                htmlFor="img-batch-input"
-                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/15 rounded-xl hover:border-amber-500/50 bg-[#161B26] hover:bg-[#1C2332] transition-all cursor-pointer text-center group"
-              >
-                <FilePlus className="w-8 h-8 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
-                <div className="text-xs font-semibold text-white">
-                  {isEn ? "Select Image Files for Batch Conversion" : "Pilih File Gambar untuk Konversi Batch"}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  PNG, JPG, WebP, GIF, SVG, BMP, AVIF
-                </div>
-              </label>
 
               {imageBatch.length > 0 && (
                 <div className="space-y-3">
@@ -823,35 +801,32 @@ export default function ConverterPage({
                   : "Ekstrak trek suara atau musik dari video MP4/WebM secara langsung di browsermu."}
               </p>
 
-              <input
-                type="file"
-                accept="video/*"
-                className="hidden"
+              <DropZone
                 id="video-to-mp3-input"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    setVideoFile(e.target.files[0]);
+                accept="video/*"
+                icon={Music}
+                title={
+                  videoFile
+                    ? videoFile.name
+                    : isEn
+                    ? "Click or Drag & Drop Video File (MP4, WebM, MOV)"
+                    : "Pilih atau Drag & Drop Video (MP4, WebM, MOV)"
+                }
+                subtitle={
+                  videoFile
+                    ? formatBytes(videoFile.size)
+                    : isEn
+                    ? "Extracts pristine audio directly in browser"
+                    : "Ekstrak audio langsung di browsermu"
+                }
+                badge={videoFile ? "Video Selected" : undefined}
+                onFilesSelected={(files) => {
+                  if (files[0]) {
+                    setVideoFile(files[0]);
                     setAudioResultUrl(null);
                   }
                 }}
               />
-
-              <label
-                htmlFor="video-to-mp3-input"
-                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/15 rounded-xl hover:border-amber-500/50 bg-[#161B26] hover:bg-[#1C2332] transition-all cursor-pointer text-center group"
-              >
-                <Music className="w-8 h-8 text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
-                <div className="text-xs font-semibold text-white">
-                  {videoFile
-                    ? videoFile.name
-                    : isEn
-                    ? "Select Video File (MP4, WebM, MOV)"
-                    : "Pilih File Video (MP4, WebM, MOV)"}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  {videoFile ? formatBytes(videoFile.size) : isEn ? "Extracts audio track" : "Ekstrak trek audio"}
-                </div>
-              </label>
 
               {videoFile && (
                 <div className="flex items-center gap-3 pt-2">
@@ -1014,30 +989,26 @@ export default function ConverterPage({
                 {/* Create ZIP */}
                 <div className="p-4 rounded-xl bg-[#141A24] border border-white/10 space-y-3">
                   <div className="font-bold text-white text-xs">{isEn ? "Create ZIP Archive" : "Buat Arsip ZIP Baru"}</div>
-                  <input
-                    type="file"
-                    multiple
-                    className="hidden"
+                  <DropZone
                     id="create-zip-input"
-                    onChange={(e) => {
-                      if (e.target.files) {
-                        setZipFiles(Array.from(e.target.files));
-                        setZipResultUrl(null);
-                      }
+                    multiple
+                    compact
+                    title={
+                      zipFiles.length > 0
+                        ? isEn
+                          ? `${zipFiles.length} files selected`
+                          : `${zipFiles.length} file dipilih`
+                        : isEn
+                        ? "Click or Drag Files to Archive"
+                        : "Pilih atau Drag File untuk di-ZIP"
+                    }
+                    subtitle={isEn ? "Add any files to compress into ZIP" : "Tambah file apapun ke arsip ZIP"}
+                    badge={zipFiles.length > 0 ? `${zipFiles.length} Files` : undefined}
+                    onFilesSelected={(files) => {
+                      setZipFiles(files);
+                      setZipResultUrl(null);
                     }}
                   />
-                  <label
-                    htmlFor="create-zip-input"
-                    className="block p-4 border border-dashed border-white/20 rounded-lg text-center cursor-pointer hover:border-amber-500/50 text-xs text-slate-300"
-                  >
-                    {zipFiles.length > 0
-                      ? isEn
-                        ? `${zipFiles.length} files selected`
-                        : `${zipFiles.length} file dipilih`
-                      : isEn
-                      ? "Select files to archive into ZIP"
-                      : "Pilih file untuk di-ZIP"}
-                  </label>
 
                   {zipFiles.length > 0 && (
                     <div className="flex items-center gap-2 pt-1">
@@ -1071,23 +1042,18 @@ export default function ConverterPage({
                 {/* Inspect ZIP */}
                 <div className="p-4 rounded-xl bg-[#141A24] border border-white/10 space-y-3">
                   <div className="font-bold text-white text-xs">{isEn ? "Inspect ZIP Archive" : "Buka & Periksa File ZIP"}</div>
-                  <input
-                    type="file"
-                    accept=".zip,application/zip"
-                    className="hidden"
+                  <DropZone
                     id="inspect-zip-input"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) {
-                        handleInspectZip(e.target.files[0]);
+                    accept=".zip,application/zip"
+                    compact
+                    title={isEn ? "Click or Drag .ZIP Archive" : "Pilih atau Drag File .ZIP"}
+                    subtitle={isEn ? "Extract and inspect archive contents" : "Periksa daftar isi dan ekstrak berkas"}
+                    onFilesSelected={(files) => {
+                      if (files[0]) {
+                        handleInspectZip(files[0]);
                       }
                     }}
                   />
-                  <label
-                    htmlFor="inspect-zip-input"
-                    className="block p-4 border border-dashed border-white/20 rounded-lg text-center cursor-pointer hover:border-amber-500/50 text-xs text-slate-300"
-                  >
-                    {isEn ? "Choose .ZIP file to extract contents" : "Pilih file .ZIP untuk dibaca isinya"}
-                  </label>
 
                   {zipEntries.length > 0 && (
                     <div className="space-y-1.5 max-h-36 overflow-y-auto">
