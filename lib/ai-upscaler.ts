@@ -98,7 +98,7 @@ async function fetchModelWithCache(
     }
   }
 
-  onProgress?.({ percent: 5, stage: "Mengunduh model Real-ESRGAN (~2.4 MB)..." });
+  onProgress?.({ percent: 5, stage: "Memuat model Real-ESRGAN Neural Network..." });
   const res = await fetch(modelUrl);
   if (!res.ok) {
     throw new Error(`Gagal mengunduh model AI dari ${modelUrl}: ${res.statusText}`);
@@ -271,7 +271,7 @@ async function runClientOnnxUpscale(
 ): Promise<{ canvas: HTMLCanvasElement; engine: string }> {
   const isAnime = modelName === "digital-art-4x";
   const modelUrl = isAnime
-    ? "/models/realesr-animevideov3.onnx"
+    ? "/models/realesr-anime-6b.onnx"
     : "/models/realesr-general-x4v3.onnx";
 
   // 1. Initialize Neural Session
@@ -366,9 +366,12 @@ async function runClientOnnxUpscale(
       const floatData = rgbaToNchw(tileImgData.data, paddedW, paddedH);
       const inputTensor = new ort.Tensor("float32", floatData, [1, 3, paddedH, paddedW]);
 
-      // Execute Neural Inference
-      const results = await session.run({ input: inputTensor });
-      const outputTensor = results.output || results[session.outputNames[0]];
+      // Execute Neural Inference with model-specific input/output names
+      const inputName = session.inputNames?.[0] || "input";
+      const outputName = session.outputNames?.[0] || "output";
+      const feeds: Record<string, any> = { [inputName]: inputTensor };
+      const results = await session.run(feeds);
+      const outputTensor = results[outputName] || results.output || results[Object.keys(results)[0]];
       const outputData = outputTensor.data as Float32Array;
 
       // Output Tile RGBA
@@ -424,7 +427,7 @@ async function runClientOnnxUpscale(
   }
 
   const modelLabel = isAnime
-    ? "Real-ESRGAN AnimeVideo v3"
+    ? "Real-ESRGAN Anime 6B (Upscayl)"
     : modelName === "remacri-4x"
     ? "Real-ESRGAN ReMacri"
     : "Real-ESRGAN General x4v3";

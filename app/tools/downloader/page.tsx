@@ -14,6 +14,9 @@ import {
   Clock,
   Trash2,
   Play,
+  RefreshCw,
+  Copy,
+  Loader2,
 } from "lucide-react";
 import CleanLink from "@/components/ui/CleanLink";
 import ShimmerButton from "@/components/ui/ShimmerButton";
@@ -54,6 +57,12 @@ export default function DownloaderPage() {
   const [downloadData, setDownloadData] = useState<DownloaderResult | null>(null);
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
   const [downloadedUrls, setDownloadedUrls] = useState<Set<string>>(new Set());
+  const [downloadProgress, setDownloadProgress] = useState<{
+    url: string;
+    percent: number;
+    loadedMb: string;
+    totalMb: string;
+  } | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   // Video & Audio In-Place Preview States
@@ -71,8 +80,43 @@ export default function DownloaderPage() {
     } catch (_) {}
   }, []);
 
-  const saveToHistory = (item: DownloaderResult, originalUrl: string) => {
+  /**
+   * Convert remote CDN thumbnail to permanent tiny base64 data URL so it never expires in history
+   */
+  const createMiniThumbnail = async (imageUrl?: string): Promise<string | undefined> => {
+    if (!imageUrl) return undefined;
     try {
+      return await new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const size = 96;
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject();
+          const natW = img.naturalWidth || img.width;
+          const natH = img.naturalHeight || img.height;
+          const minDim = Math.min(natW, natH);
+          const sx = (natW - minDim) / 2;
+          const sy = (natH - minDim) / 2;
+          ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+          resolve(canvas.toDataURL("image/jpeg", 0.65));
+        };
+        img.onerror = () => reject();
+        img.src = imageUrl.startsWith("data:")
+          ? imageUrl
+          : `/api/download/stream?url=${encodeURIComponent(imageUrl)}&inline=1`;
+      });
+    } catch {
+      return imageUrl;
+    }
+  };
+
+  const saveToHistory = async (item: DownloaderResult, originalUrl: string) => {
+    try {
+      const persistentThumbnail = await createMiniThumbnail(item.thumbnail);
       const newEntry: HistoryItem = {
         id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         url: originalUrl,
@@ -80,7 +124,7 @@ export default function DownloaderPage() {
         author: item.author,
         platform: item.platform,
         platformName: item.platformName,
-        thumbnail: item.thumbnail,
+        thumbnail: persistentThumbnail || item.thumbnail,
         timestamp: Date.now(),
       };
       setHistory((prev) => {
@@ -159,23 +203,75 @@ export default function DownloaderPage() {
     }
   };
 
-  const handleDownloadFile = (item: MediaDownloadItem) => {
+  const handleDownloadFile = async (item: MediaDownloadItem) => {
     setDownloadingUrl(item.url);
     setDownloadedUrls((prev) => new Set(prev).add(item.url));
 
-    const cleanFilename = `grainox-${downloadData?.platform || "media"}-${Date.now()}.${item.format || "mp4"}`;
+    const cleanFilename = `grainox-${downloadData?.platform || "media"}-${Date.now()}.${item.format || (item.type === "audio" ? "mp3" : "mp4")}`;
     const streamUrl = `/api/download/stream?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(cleanFilename)}`;
 
-    const link = document.createElement("a");
-    link.href = streamUrl;
-    link.download = cleanFilename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const response = await fetch(streamUrl);
+      if (!response.ok || !response.body) {
+        throw new Error("Gagal memulai stream media");
+      }
 
-    setTimeout(() => {
-      setDownloadingUrl(null);
-    }, 2000);
+      const contentLength = response.headers.get("Content-Length");
+      const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let receivedBytes = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        receivedBytes += value.length;
+
+        if (totalBytes > 0) {
+          const percent = Math.min(100, Math.round((receivedBytes / totalBytes) * 100));
+          setDownloadProgress({
+            url: item.url,
+            percent,
+            loadedMb: (receivedBytes / (1024 * 1024)).toFixed(1),
+            totalMb: (totalBytes / (1024 * 1024)).toFixed(1),
+          });
+        } else {
+          setDownloadProgress({
+            url: item.url,
+            percent: 60,
+            loadedMb: (receivedBytes / (1024 * 1024)).toFixed(1),
+            totalMb: "?",
+          });
+        }
+      }
+
+      const blobType =
+        item.type === "audio" ? "audio/mpeg" : item.type === "image" ? "image/jpeg" : "video/mp4";
+      const blob = new Blob(chunks as any, { type: blobType });
+      const blobUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = cleanFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    } catch {
+      // Fallback directly to browser native download if stream reader fails
+      const link = document.createElement("a");
+      link.href = streamUrl;
+      link.download = cleanFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      setTimeout(() => {
+        setDownloadingUrl(null);
+        setDownloadProgress(null);
+      }, 1200);
+    }
   };
 
   // Find primary video / audio for in-place player
@@ -255,9 +351,42 @@ export default function DownloaderPage() {
           </div>
 
           {errorMessage && (
-            <div className="flex items-start gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/25 p-3 rounded-xl leading-relaxed">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
-              <span>{errorMessage}</span>
+            <div className="rounded-xl bg-rose-500/[0.08] border border-rose-500/25 p-3.5 space-y-2.5 animate-in fade-in duration-200">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                <div className="space-y-0.5 min-w-0 flex-1">
+                  <p className="text-xs font-bold text-rose-300">Gagal Mengambil Media Pihak Ketiga</p>
+                  <p className="text-[11px] font-mono text-rose-200/90 leading-relaxed">{errorMessage}</p>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-rose-500/20 text-[11px] text-slate-300 space-y-1">
+                <p className="font-semibold text-slate-300">Tips & Solusi:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-slate-400 pl-0.5 text-[11px]">
+                  <li>Pastikan postingan media bersifat <strong>publik</strong> (bukan akun privat).</li>
+                  <li>Jika memakai browser, coba salin tautan langsung dari aplikasi (tombol Share → Copy Link).</li>
+                  <li>Jika server pihak ketiga sedang dibatasi laju request (rate limit), tunggu sejenak lalu klik Coba Lagi.</li>
+                </ul>
+                <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleFetch(undefined, url)}
+                    disabled={isLoading}
+                    className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-200 hover:text-slate-950 text-[11px] font-bold flex items-center gap-1.5 transition-all border border-rose-500/30"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`} />
+                    Coba Lagi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePaste}
+                    className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/10 text-slate-300 text-[11px] flex items-center gap-1.5 transition-all border border-white/10"
+                  >
+                    <Copy className="w-3 h-3 text-amber-400" />
+                    Tempel Link Baru
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </form>
@@ -403,70 +532,109 @@ export default function DownloaderPage() {
                     ? "MP3 Audio"
                     : item.quality.replace(/\s*\(.*?\)/g, "").trim() || (isVideo ? "Video" : "Photo");
 
+                  const isCurrentDownloading = downloadingUrl === item.url;
+
                   return (
                     <div
                       key={idx}
-                      className={`flex items-center justify-between p-3 rounded-xl border text-left transition-all group ${
+                      className={`flex flex-col p-3 rounded-xl border text-left transition-all group ${
                         isDownloaded
                           ? "bg-[#0E1A17] border-emerald-500/50 shadow-sm shadow-emerald-500/10"
                           : "bg-[#161B26] hover:bg-[#1C2332] border-white/10 hover:border-amber-500/40"
                       }`}
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadFile(item)}
-                        disabled={downloadingUrl === item.url}
-                        className="flex items-center gap-3 min-w-0 flex-1 text-left focus:outline-none"
-                      >
-                        <div
-                          className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
-                            isDownloaded
-                              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                              : "bg-amber-500/10 border-amber-500/25 text-amber-400"
-                          }`}
-                        >
-                          {isDownloaded ? <Check className="w-4 h-4 stroke-[3]" /> : <Icon className="w-4 h-4" />}
-                        </div>
-                        <div className="min-w-0 flex-1 pr-2">
-                          <div className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors flex items-center gap-2">
-                            <span className="whitespace-nowrap">{displayQuality}</span>
-                            <span
-                              className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded shrink-0 ${
-                                isDownloaded
-                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                                  : "bg-white/[0.08] text-slate-200"
-                              }`}
-                            >
-                              {item.format}
-                            </span>
-                          </div>
-                          {item.size && (
-                            <div className="text-[11px] text-slate-400 font-mono mt-0.5">{item.size}</div>
-                          )}
-                        </div>
-                      </button>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {/* Download File Button */}
+                      <div className="flex items-center justify-between">
                         <button
                           type="button"
                           onClick={() => handleDownloadFile(item)}
-                          disabled={downloadingUrl === item.url}
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                            isDownloaded
-                              ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/30 scale-105"
-                              : "bg-white/[0.05] hover:bg-amber-500 hover:text-[#080A0E] text-slate-200"
-                          }`}
-                          title={isDownloaded ? "Berhasil Diunduh" : "Download"}
-                          aria-label={isDownloaded ? "Berhasil Diunduh" : "Download"}
+                          disabled={isCurrentDownloading}
+                          className="flex items-center gap-3 min-w-0 flex-1 text-left focus:outline-none"
                         >
-                          {isDownloaded ? (
-                            <Check className="w-4 h-4 stroke-[3]" />
-                          ) : (
-                            <Download className="w-4 h-4" />
-                          )}
+                          <div
+                            className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                              isDownloaded
+                                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                                : isCurrentDownloading
+                                ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                                : "bg-amber-500/10 border-amber-500/25 text-amber-400"
+                            }`}
+                          >
+                            {isDownloaded ? (
+                              <Check className="w-4 h-4 stroke-[3]" />
+                            ) : isCurrentDownloading ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                            ) : (
+                              <Icon className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1 pr-2">
+                            <div className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors flex items-center gap-2">
+                              <span className="whitespace-nowrap">{displayQuality}</span>
+                              <span
+                                className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded shrink-0 ${
+                                  isDownloaded
+                                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                    : "bg-white/[0.08] text-slate-200"
+                                }`}
+                              >
+                                {item.format}
+                              </span>
+                            </div>
+                            {item.size && (
+                              <div className="text-[11px] text-slate-400 font-mono mt-0.5">{item.size}</div>
+                            )}
+                          </div>
                         </button>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Download File Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadFile(item)}
+                            disabled={isCurrentDownloading}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                              isDownloaded
+                                ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/30 scale-105"
+                                : isCurrentDownloading
+                                ? "bg-amber-500 text-slate-950 font-bold"
+                                : "bg-white/[0.05] hover:bg-amber-500 hover:text-[#080A0E] text-slate-200"
+                            }`}
+                            title={isDownloaded ? "Berhasil Diunduh" : "Download"}
+                            aria-label={isDownloaded ? "Berhasil Diunduh" : "Download"}
+                          >
+                            {isDownloaded ? (
+                              <Check className="w-4 h-4 stroke-[3]" />
+                            ) : isCurrentDownloading ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Live Stream Byte Download Progress Bar */}
+                      {isCurrentDownloading && downloadProgress && downloadProgress.url === item.url && (
+                        <div className="w-full mt-2.5 pt-2 border-t border-white/[0.06] animate-in fade-in duration-150">
+                          <div className="flex items-center justify-between text-[10px] font-mono text-amber-400 mb-1">
+                            <span className="flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block" />
+                              Mengunduh stream...
+                            </span>
+                            <span>
+                              {downloadProgress.loadedMb} MB{" "}
+                              {downloadProgress.totalMb !== "?" ? `/ ${downloadProgress.totalMb} MB` : ""}{" "}
+                              ({downloadProgress.percent}%)
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/10">
+                            <div
+                              className="h-full bg-gradient-to-r from-amber-500 to-amber-300 transition-all duration-150 rounded-full"
+                              style={{ width: `${downloadProgress.percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -506,6 +674,9 @@ export default function DownloaderPage() {
                       src={item.thumbnail}
                       alt={item.title}
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                      }}
                       className="w-10 h-10 rounded-lg object-cover bg-black shrink-0"
                     />
                   ) : (

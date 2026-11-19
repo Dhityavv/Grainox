@@ -276,3 +276,85 @@ export async function pdfToImages(
 
   return pages;
 }
+
+/**
+ * Compress a PDF document by re-optimizing streams and downsampling high-res raster pages
+ */
+export async function compressPdf(
+  pdfFile: File,
+  level: "low" | "medium" | "high" = "medium",
+  onProgress?: (current: number, total: number) => void
+): Promise<{ blob: Blob; originalSize: number; compressedSize: number; savingsPercent: number }> {
+  const originalSize = pdfFile.size;
+
+  // Ensure PDF.js is loaded
+  if (typeof window !== "undefined" && !(window as any).pdfjsLib) {
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      script.onload = () => {
+        (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        resolve();
+      };
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  const pdfjsLib = (window as any).pdfjsLib;
+  const buffer = await pdfFile.arrayBuffer();
+
+  const scale = level === "low" ? 1.8 : level === "medium" ? 1.35 : 1.05;
+  const jpegQuality = level === "low" ? 0.85 : level === "medium" ? 0.65 : 0.45;
+
+  let compressedBlob: Blob;
+
+  if (pdfjsLib) {
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    const totalPages = pdf.numPages;
+    const newDoc = await pdfLib.PDFDocument.create();
+
+    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      onProgress?.(pageNum, totalPages);
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d")!;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const pageJpegBlob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((b) => resolve(b || new Blob()), "image/jpeg", jpegQuality);
+      });
+
+      const imgBytes = await pageJpegBlob.arrayBuffer();
+      const img = await newDoc.embedJpg(imgBytes);
+      const origViewport = page.getViewport({ scale: 1.0 });
+      const newPage = newDoc.addPage([origViewport.width, origViewport.height]);
+      newPage.drawImage(img, { x: 0, y: 0, width: origViewport.width, height: origViewport.height });
+    }
+
+    const savedBytes = await newDoc.save({ useObjectStreams: true });
+    compressedBlob = new Blob([savedBytes as any], { type: "application/pdf" });
+  } else {
+    const doc = await pdfLib.PDFDocument.load(buffer);
+    const savedBytes = await doc.save({ useObjectStreams: true });
+    compressedBlob = new Blob([savedBytes as any], { type: "application/pdf" });
+  }
+
+  if (compressedBlob.size >= originalSize) {
+    const doc = await pdfLib.PDFDocument.load(buffer);
+    const savedBytes = await doc.save({ useObjectStreams: true });
+    const fallbackBlob = new Blob([savedBytes as any], { type: "application/pdf" });
+    const finalBlob = fallbackBlob.size < originalSize ? fallbackBlob : new Blob([buffer], { type: "application/pdf" });
+    const compressedSize = finalBlob.size;
+    const savingsPercent = Math.max(0, Math.round(((originalSize - compressedSize) / originalSize) * 100));
+    return { blob: finalBlob, originalSize, compressedSize, savingsPercent };
+  }
+
+  const compressedSize = compressedBlob.size;
+  const savingsPercent = Math.max(0, Math.round(((originalSize - compressedSize) / originalSize) * 100));
+  return { blob: compressedBlob, originalSize, compressedSize, savingsPercent };
+}

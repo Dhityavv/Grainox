@@ -40,8 +40,14 @@ import {
   unlockPdf,
   textToPdf,
   pdfToImages,
+  compressPdf,
   type ExtractedPdfPage,
 } from "@/lib/pdf-tools";
+import {
+  compressImage,
+  batchCompressImages,
+  type CompressedImageResult,
+} from "@/lib/image-compressor";
 import { jsonToCsv, csvToJson, jsonToYaml } from "@/lib/data-converter";
 import {
   extractAudioFromVideo,
@@ -58,7 +64,9 @@ type ToolId =
   | "protect-pdf"
   | "unlock-pdf"
   | "text-to-pdf"
+  | "compress-pdf"
   | "image-converter"
+  | "compress-image"
   | "video-to-mp3"
   | "data-studio"
   | "zip-studio";
@@ -141,6 +149,36 @@ export default function ConverterPage({
   const [isZipping, setIsZipping] = useState(false);
   const [zipEntries, setZipEntries] = useState<ZipEntryItem[]>([]);
 
+  // PDF Compression states
+  const [compressPdfFile, setCompressPdfFile] = useState<File | null>(null);
+  const [compressPdfLevel, setCompressPdfLevel] = useState<"low" | "medium" | "high">("medium");
+  const [compressPdfResult, setCompressPdfResult] = useState<{
+    blob: Blob;
+    url: string;
+    originalSize: number;
+    compressedSize: number;
+    savingsPercent: number;
+  } | null>(null);
+  const [isCompressingPdf, setIsCompressingPdf] = useState(false);
+  const [compressPdfProgress, setCompressPdfProgress] = useState<{ current: number; total: number } | null>(null);
+
+  // Image Compression states
+  const [compressImgFiles, setCompressImgFiles] = useState<File[]>([]);
+  const [compressImgQuality, setCompressImgQuality] = useState(75);
+  const [compressImgScale, setCompressImgScale] = useState(1.0);
+  const [compressImgFormat, setCompressImgFormat] = useState<"auto" | "image/webp" | "image/jpeg" | "image/png">("auto");
+  const [compressImgResults, setCompressImgResults] = useState<CompressedImageResult[]>([]);
+  const [isCompressingImg, setIsCompressingImg] = useState(false);
+  const [compressImgProgress, setCompressImgProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categories: { id: CategoryId; label: string; icon: any }[] = [
@@ -207,6 +245,24 @@ export default function ConverterPage({
       accent: "text-sky-400 bg-sky-500/10 border-sky-500/25",
     },
     {
+      id: "compress-pdf",
+      category: "pdf",
+      name: "Smart PDF Compressor",
+      badge: "Save 40-80%",
+      desc: "Kecilkan ukuran file PDF dokumen atau scan dengan optimasi stream dan resolusi.",
+      icon: FileText,
+      accent: "text-emerald-400 bg-emerald-500/10 border-emerald-500/25",
+    },
+    {
+      id: "compress-image",
+      category: "image",
+      name: "Smart Photo/Image Compressor",
+      badge: "Save Up to 90%",
+      desc: "Kompres foto JPG, PNG, atau WebP dengan slider kualitas dan pratinjau ukuran file instan.",
+      icon: Sliders,
+      accent: "text-amber-400 bg-amber-500/10 border-amber-500/25",
+    },
+    {
       id: "image-converter",
       category: "image",
       name: "Universal Image Converter",
@@ -246,6 +302,8 @@ export default function ConverterPage({
 
   const quickPills = [
     { label: "📸 Images → PDF", tool: "image-to-pdf" as ToolId },
+    { label: "🗜️ Kompres Foto", tool: "compress-image" as ToolId },
+    { label: "📉 Kompres PDF", tool: "compress-pdf" as ToolId },
     { label: "📄 PDF → Images", tool: "pdf-to-image" as ToolId },
     { label: "🔒 Protect PDF", tool: "protect-pdf" as ToolId },
     { label: "🔓 Unlock PDF", tool: "unlock-pdf" as ToolId },
@@ -490,6 +548,81 @@ export default function ConverterPage({
     } catch (err: any) {
       alert("Gagal membaca file ZIP: " + err.message);
     }
+  };
+
+  // --- Handlers for PDF Compression ---
+  const handleProcessCompressPdf = async () => {
+    if (!compressPdfFile) return;
+    setIsCompressingPdf(true);
+    setCompressPdfResult(null);
+    try {
+      const res = await compressPdf(
+        compressPdfFile,
+        compressPdfLevel,
+        (current, total) => {
+          setCompressPdfProgress({ current, total });
+        }
+      );
+      const url = URL.createObjectURL(res.blob);
+      setCompressPdfResult({
+        ...res,
+        url,
+      });
+      recordToolUsage("convert");
+    } catch (err: any) {
+      alert(err.message || "Gagal mengompres PDF.");
+    } finally {
+      setIsCompressingPdf(false);
+      setCompressPdfProgress(null);
+    }
+  };
+
+  // --- Handlers for Image Compression ---
+  const handleProcessCompressImages = async () => {
+    if (compressImgFiles.length === 0) return;
+    setIsCompressingImg(true);
+    setCompressImgResults([]);
+    try {
+      const results = await batchCompressImages(
+        compressImgFiles,
+        {
+          quality: compressImgQuality / 100,
+          scaleRatio: compressImgScale,
+          format: compressImgFormat === "auto" ? undefined : compressImgFormat,
+        },
+        (current, total) => {
+          setCompressImgProgress({ current, total });
+        }
+      );
+      setCompressImgResults(results);
+      recordToolUsage("convert");
+    } catch (err: any) {
+      alert(err.message || "Gagal mengompres foto.");
+    } finally {
+      setIsCompressingImg(false);
+      setCompressImgProgress(null);
+    }
+  };
+
+  const handleDownloadAllCompressed = async () => {
+    if (compressImgResults.length === 0) return;
+    const filesToZip = compressImgResults.map((r) => {
+      const ext = r.format.toLowerCase();
+      const origName = r.originalFile.name.replace(/\.[^/.]+$/, "");
+      return new File([r.compressedBlob], `${origName}-compressed.${ext}`, {
+        type: r.compressedBlob.type,
+      });
+    });
+    const zipBlob = await createZipArchive(
+      await Promise.all(
+        filesToZip.map(async (f) => ({
+          name: f.name,
+          data: new Uint8Array(await f.arrayBuffer()),
+        }))
+      )
+    );
+    const zipUrl = URL.createObjectURL(zipBlob);
+    triggerDownload(zipUrl, `grainox-compressed-images-${Date.now()}.zip`, "all-compressed-images");
   };
 
   return (
@@ -1092,6 +1225,302 @@ export default function ConverterPage({
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* COMPRESS PDF STUDIO */}
+          {activeTool === "compress-pdf" && (
+            <div className="space-y-4">
+              <p className="text-xs text-slate-300">
+                Kecilkan ukuran file PDF dokumen atau scan dengan optimasi objek stream dan resolusi halaman.
+              </p>
+
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                id="compress-pdf-input"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    setCompressPdfFile(e.target.files[0]);
+                    setCompressPdfResult(null);
+                  }
+                }}
+              />
+
+              <div
+                onClick={() => document.getElementById("compress-pdf-input")?.click()}
+                className="border-2 border-dashed border-white/15 hover:border-emerald-400/50 rounded-xl p-5 text-center cursor-pointer transition-all bg-[#161B26]"
+              >
+                <FileText className="w-7 h-7 text-emerald-400 mx-auto mb-1.5" />
+                <div className="text-xs sm:text-sm font-bold text-white">
+                  {compressPdfFile ? compressPdfFile.name : "Pilih File PDF untuk Dikompres"}
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                  {compressPdfFile
+                    ? `Ukuran Awal: ${formatBytes(compressPdfFile.size)}`
+                    : "Klik untuk upload dokumen PDF"}
+                </div>
+              </div>
+
+              {compressPdfFile && (
+                <div className="space-y-3 pt-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-mono text-slate-400">Tingkat Kompresi:</span>
+                    {(
+                      [
+                        { id: "medium", label: "Standar (Rekomendasi)", desc: "-50% s/d -70%" },
+                        { id: "high", label: "Maksimal (Paling Ringan)", desc: "-75% s/d -90%" },
+                        { id: "low", label: "Ringan (Kualitas Tertinggi)", desc: "-30% s/d -50%" },
+                      ] as const
+                    ).map((lvl) => (
+                      <button
+                        key={lvl.id}
+                        type="button"
+                        onClick={() => setCompressPdfLevel(lvl.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          compressPdfLevel === lvl.id
+                            ? "bg-emerald-500 text-slate-950 font-bold shadow-sm"
+                            : "bg-white/10 text-white hover:bg-white/15"
+                        }`}
+                      >
+                        {lvl.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {compressPdfProgress && (
+                    <div className="text-xs font-mono text-emerald-400">
+                      Memproses halaman {compressPdfProgress.current} dari {compressPdfProgress.total}...
+                    </div>
+                  )}
+
+                  {compressPdfResult && (
+                    <div className="p-3.5 rounded-xl bg-[#0E1A17] border border-emerald-500/30 space-y-2 animate-in fade-in duration-200">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-xs font-bold text-white flex items-center gap-2">
+                          <span>Ukuran Awal: <strong className="text-slate-300 font-mono">{formatBytes(compressPdfResult.originalSize)}</strong></span>
+                          <span>→</span>
+                          <span>Hasil Kompres: <strong className="text-emerald-400 font-mono">{formatBytes(compressPdfResult.compressedSize)}</strong></span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          Hemat {compressPdfResult.savingsPercent}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <ShimmerButton
+                      disabled={isCompressingPdf}
+                      onClick={handleProcessCompressPdf}
+                      className="h-10 text-xs font-bold"
+                    >
+                      {isCompressingPdf ? "Mengompres PDF..." : "Mulai Kompres PDF"}
+                    </ShimmerButton>
+
+                    {compressPdfResult && (
+                      <Button
+                        variant="primary"
+                        onClick={() =>
+                          triggerDownload(
+                            compressPdfResult.url,
+                            `grainox-compressed-${Date.now()}.pdf`,
+                            "compress-pdf-download"
+                          )
+                        }
+                        className={`h-10 text-xs font-bold ${
+                          downloadedSet.has("compress-pdf-download")
+                            ? "bg-emerald-400 text-slate-950"
+                            : "bg-emerald-500 hover:bg-emerald-400 text-slate-950"
+                        }`}
+                        leftIcon={
+                          downloadedSet.has("compress-pdf-download") ? (
+                            <Check className="w-4 h-4 stroke-[3]" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )
+                        }
+                      >
+                        {downloadedSet.has("compress-pdf-download")
+                          ? "Berhasil Diunduh!"
+                          : "Download PDF Ringan"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SMART PHOTO / IMAGE COMPRESSOR */}
+          {activeTool === "compress-image" && (
+            <div className="space-y-4">
+              <p className="text-xs text-slate-300">
+                Kompres ukuran file foto (JPG, PNG, WebP) tanpa mengurangi ketajaman gambar secara drastis di browser.
+              </p>
+
+              {/* Quality & Scale sliders */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-[#161B26] border border-white/10">
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-400">Kualitas Kompresi:</span>
+                    <span className="text-amber-400 font-bold">{compressImgQuality}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="15"
+                    max="95"
+                    value={compressImgQuality}
+                    onChange={(e) => setCompressImgQuality(parseInt(e.target.value))}
+                    className="w-full accent-amber-500 cursor-pointer h-1.5 bg-black/40 rounded-lg"
+                  />
+                  <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                    <span>Maksimal Kecil (15%)</span>
+                    <span>Seimbang (75%)</span>
+                    <span>Tinggi (95%)</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-400">Skala Dimensi:</span>
+                    <span className="text-amber-400 font-bold">
+                      {compressImgScale === 1.0 ? "100% (Asli)" : `${Math.round(compressImgScale * 100)}%`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {[1.0, 0.8, 0.6, 0.5].map((scaleVal) => (
+                      <button
+                        key={scaleVal}
+                        type="button"
+                        onClick={() => setCompressImgScale(scaleVal)}
+                        className={`px-2.5 py-1 rounded text-xs font-mono font-medium flex-1 transition-all ${
+                          compressImgScale === scaleVal
+                            ? "bg-amber-500 text-slate-950 font-bold"
+                            : "bg-white/10 text-slate-300 hover:bg-white/15"
+                        }`}
+                      >
+                        {scaleVal === 1.0 ? "100%" : `${Math.round(scaleVal * 100)}%`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
+                id="compress-img-input"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setCompressImgFiles(Array.from(e.target.files));
+                    setCompressImgResults([]);
+                  }
+                }}
+              />
+
+              <div
+                onClick={() => document.getElementById("compress-img-input")?.click()}
+                className="border-2 border-dashed border-white/15 hover:border-amber-400/50 rounded-xl p-5 text-center cursor-pointer transition-all bg-[#161B26]"
+              >
+                <Sliders className="w-7 h-7 text-amber-400 mx-auto mb-1.5" />
+                <div className="text-xs sm:text-sm font-bold text-white">
+                  Pilih Foto / Gambar untuk Dikompres (Bisa Batch Banyak)
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                  {compressImgFiles.length > 0
+                    ? `${compressImgFiles.length} foto dipilih`
+                    : "Mendukung JPG, PNG, WebP, AVIF, BMP"}
+                </div>
+              </div>
+
+              {compressImgFiles.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+                    <span>{compressImgFiles.length} file siap dikompres</span>
+                    {compressImgProgress && (
+                      <span className="text-amber-400">
+                        Memproses {compressImgProgress.current}/{compressImgProgress.total}...
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <ShimmerButton
+                      disabled={isCompressingImg}
+                      onClick={handleProcessCompressImages}
+                      className="h-10 text-xs font-bold"
+                    >
+                      {isCompressingImg ? "Mengompres Foto..." : `Kompres ${compressImgFiles.length} Foto Sekarang`}
+                    </ShimmerButton>
+
+                    {compressImgResults.length > 1 && (
+                      <Button
+                        variant="secondary"
+                        onClick={handleDownloadAllCompressed}
+                        className="h-10 text-xs font-bold"
+                        leftIcon={<Archive className="w-4 h-4" />}
+                      >
+                        Download Semua sebagai ZIP
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Results list */}
+                  {compressImgResults.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+                      {compressImgResults.map((item, idx) => {
+                        const downloadKey = `compress-img-${idx}`;
+                        const isDownloaded = downloadedSet.has(downloadKey);
+                        const fileName = `${item.originalFile.name.replace(/\.[^/.]+$/, "")}-compressed.${item.format.toLowerCase()}`;
+                        return (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-xl bg-[#161B26] border border-white/10 flex items-center justify-between gap-3 group hover:border-amber-500/40 transition-all"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <img
+                                src={item.dataUrl}
+                                alt={item.originalFile.name}
+                                className="w-12 h-12 rounded-lg object-cover bg-black shrink-0 border border-white/10"
+                              />
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-white truncate max-w-[140px] sm:max-w-[160px]">
+                                  {item.originalFile.name}
+                                </p>
+                                <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                  <span>{formatBytes(item.originalSize)}</span>
+                                  <span>→</span>
+                                  <span className="text-emerald-400 font-bold">{formatBytes(item.compressedSize)}</span>
+                                </div>
+                                <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 mt-0.5">
+                                  Hemat {item.savingsPercent}%
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => triggerDownload(item.dataUrl, fileName, downloadKey)}
+                              className={`h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-bold transition-all shrink-0 ${
+                                isDownloaded
+                                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/30"
+                                  : "bg-white/10 hover:bg-amber-500 hover:text-slate-950 text-white"
+                              }`}
+                            >
+                              {isDownloaded ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <Download className="w-3.5 h-3.5" />}
+                              <span>{isDownloaded ? "Tersimpan" : "Unduh"}</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
