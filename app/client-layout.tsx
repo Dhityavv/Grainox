@@ -1,16 +1,21 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import InfoModal from "@/components/InfoModal";
 import CommandPalette from "@/components/CommandPalette";
 import PwaManager from "@/components/pwa/PwaManager";
 import { LanguageProvider } from "@/lib/i18n";
+import { initGlobalSound } from "@/lib/sound-effects";
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+
+  useEffect(() => {
+    initGlobalSound();
+  }, []);
 
   return (
     <LanguageProvider>
