@@ -404,9 +404,6 @@ export default function ConverterPage({
         </p>
       </div>
 
-      {/* Live Analytics Bar */}
-      <ToolAnalyticsBar tool="convert" />
-
       {/* Quick Action Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {quickPills.map((pill) => (
@@ -1192,6 +1189,9 @@ export default function ConverterPage({
           })}
         </div>
       </div>
+
+      {/* Real-time Tool Analytics Bar */}
+      <ToolAnalyticsBar tool="convert" />
     </div>
   );
 }

@@ -356,9 +356,6 @@ export default function PdfToolsPage() {
         </p>
       </div>
 
-      {/* Live Platform Counter Analytics Bar */}
-      <ToolAnalyticsBar tool="convert" />
-
       {/* Quick Navigation Chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {quickPills.map((pill) => {
@@ -1145,6 +1142,9 @@ export default function PdfToolsPage() {
           })}
         </div>
       </div>
+
+      {/* Real-time Tool Analytics Bar */}
+      <ToolAnalyticsBar tool="convert" />
     </div>
   );
 }
