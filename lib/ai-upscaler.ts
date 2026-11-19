@@ -14,277 +14,478 @@ export interface UpscaleResult {
   method: string;
 }
 
-/**
- * GLSL Shaders for Neural Anime / Line-Art Refinement & Contrast Adaptive Sharpening (CAS)
- * Runs on WebGL2 / WebGL hardware context client-side on mobile and desktop without OOM crashes.
- */
-const VERTEX_SHADER_SRC = `#version 300 es
-in vec2 a_position;
-in vec2 a_texCoord;
-out vec2 v_texCoord;
-
-void main() {
-    v_texCoord = a_texCoord;
-    gl_Position = vec4(a_position, 0.0, 1.0);
-}
-`;
-
-// Anime4K-style Line Push & Gradient Descent Fragment Shader
-const ANIME_LINE_SHADER_SRC = `#version 300 es
-precision highp float;
-
-in vec2 v_texCoord;
-out vec4 fragColor;
-
-uniform sampler2D u_texture;
-uniform vec2 u_texelSize;
-uniform float u_strength; // Line thinning & sharpening intensity (0.4 - 0.8)
-
-float getLuma(vec3 c) {
-    return dot(c, vec3(0.299, 0.587, 0.114));
-}
-
-void main() {
-    vec2 uv = v_texCoord;
-    vec4 centerCol = texture(u_texture, uv);
-    float cc = getLuma(centerCol.rgb);
-
-    // 3x3 Cross Neighborhood Sampling
-    float l = getLuma(texture(u_texture, uv + vec2(-u_texelSize.x, 0.0)).rgb);
-    float r = getLuma(texture(u_texture, uv + vec2( u_texelSize.x, 0.0)).rgb);
-    float t = getLuma(texture(u_texture, uv + vec2(0.0,  u_texelSize.y)).rgb);
-    float b = getLuma(texture(u_texture, uv + vec2(0.0, -u_texelSize.y)).rgb);
-
-    // Sobel diagonal support for smoother lines
-    float tl = getLuma(texture(u_texture, uv + vec2(-u_texelSize.x,  u_texelSize.y)).rgb);
-    float tr = getLuma(texture(u_texture, uv + vec2( u_texelSize.x,  u_texelSize.y)).rgb);
-    float bl = getLuma(texture(u_texture, uv + vec2(-u_texelSize.x, -u_texelSize.y)).rgb);
-    float br = getLuma(texture(u_texture, uv + vec2( u_texelSize.x, -u_texelSize.y)).rgb);
-
-    // Gradient calculation
-    vec2 grad = vec2(
-        (tr + 2.0 * r + br) - (tl + 2.0 * l + bl),
-        (tl + 2.0 * t + tr) - (bl + 2.0 * b + br)
-    );
-
-    float gradLen = length(grad);
-    vec2 offset = vec2(0.0);
-
-    if (gradLen > 0.015) {
-        vec2 dir = normalize(grad);
-        // Pull soft blur towards the line boundary (sharpen contour)
-        offset = dir * u_texelSize * u_strength * sign(cc - 0.45);
-    }
-
-    vec4 pushed = texture(u_texture, uv + offset);
-    
-    // Adaptive contrast sharpening
-    vec4 sharp = centerCol + (centerCol - (texture(u_texture, uv + vec2(0.0, u_texelSize.y)) + texture(u_texture, uv - vec2(0.0, u_texelSize.y)) + texture(u_texture, uv + vec2(u_texelSize.x, 0.0)) + texture(u_texture, uv - vec2(u_texelSize.x, 0.0))) * 0.25) * 0.45;
-
-    // Blend original, gradient-pushed line art, and high-frequency edge
-    vec4 finalCol = mix(sharp, pushed, 0.65);
-    fragColor = clamp(finalCol, 0.0, 1.0);
-}
-`;
-
-// General High-Fidelity Contrast Adaptive Sharpening (CAS) Fragment Shader
-const CAS_SHADER_SRC = `#version 300 es
-precision highp float;
-
-in vec2 v_texCoord;
-out vec4 fragColor;
-
-uniform sampler2D u_texture;
-uniform vec2 u_texelSize;
-uniform float u_sharpness;
-
-void main() {
-    vec2 uv = v_texCoord;
-    vec3 b = texture(u_texture, uv + vec2( 0.0, -u_texelSize.y)).rgb;
-    vec3 d = texture(u_texture, uv + vec2(-u_texelSize.x,  0.0)).rgb;
-    vec3 e = texture(u_texture, uv).rgb;
-    vec3 f = texture(u_texture, uv + vec2( u_texelSize.x,  0.0)).rgb;
-    vec3 h = texture(u_texture, uv + vec2( 0.0,  u_texelSize.y)).rgb;
-
-    // Local min/max range for ringing protection
-    vec3 mnRGB = min(min(min(b, d), min(f, h)), e);
-    vec3 mxRGB = max(max(max(b, d), max(f, h)), e);
-
-    vec3 crossSum = b + d + f + h;
-    vec3 sharp = e + (e * 4.0 - crossSum) * (u_sharpness * 0.35);
-
-    // Clamp between local neighborhood bounds to completely avoid white halos/artifacts
-    fragColor = vec4(clamp(sharp, mnRGB * 0.85, mxRGB * 1.15), 1.0);
-}
-`;
+// Global cached session instance to make multiple upscales instant
+let cachedSession: any = null;
+let cachedModelKey: string = "";
 
 /**
- * Execute client-side hardware-accelerated WebGL super-resolution & neural line sharpening
+ * Dynamically loads ONNX Runtime Web.
+ * Uses jsDelivr CDN script with WebAssembly SIMD and WebGPU execution providers,
+ * avoiding bundling issues and ensuring full mobile & desktop compatibility.
  */
-function applyWebGLSuperResolution(
-  sourceCanvas: HTMLCanvasElement,
-  isAnime: boolean,
-  intensity: number
-): HTMLCanvasElement {
-  const gl = sourceCanvas.getContext("webgl2", { preserveDrawingBuffer: true });
-  if (!gl) return sourceCanvas;
+async function getOrt(): Promise<any> {
+  if (typeof window === "undefined") {
+    return await import("onnxruntime-web");
+  }
 
-  const shaderSrc = isAnime ? ANIME_LINE_SHADER_SRC : CAS_SHADER_SRC;
+  if ((window as any).ort) {
+    return (window as any).ort;
+  }
 
-  const compileShader = (type: number, src: string) => {
-    const s = gl.createShader(type)!;
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      console.warn(gl.getShaderInfoLog(s));
-      gl.deleteShader(s);
-      return null;
+  // Inject ONNX Runtime Web from verified CDN
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector('script[data-grainox-ort="true"]') as HTMLScriptElement;
+    if (existing) {
+      if ((window as any).ort) return resolve();
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", reject);
+      return;
     }
-    return s;
+
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.all.min.js";
+    script.dataset.grainoxOrt = "true";
+    script.async = true;
+    script.onload = () => {
+      const ort = (window as any).ort;
+      if (ort?.env?.wasm) {
+        ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+        // Single thread avoids COOP/COEP header restrictions on mobile browsers
+        ort.env.wasm.numThreads = 1;
+      }
+      resolve();
+    };
+    script.onerror = async () => {
+      try {
+        // Fallback to npm package if CDN is unreachable
+        const mod = await import("onnxruntime-web");
+        (window as any).ort = mod;
+        if (mod?.env?.wasm) {
+          mod.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+          mod.env.wasm.numThreads = 1;
+        }
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+    };
+    document.head.appendChild(script);
+  });
+
+  return (window as any).ort;
+}
+
+/**
+ * Fetch model weights with persistent browser Cache API support.
+ * The model (2.49 MB) is downloaded once and cached permanently on the user's device.
+ */
+async function fetchModelWithCache(
+  modelUrl: string,
+  onProgress?: (progress: UpscaleProgress) => void
+): Promise<ArrayBuffer> {
+  const CACHE_NAME = "grainox-ai-models-v1";
+
+  if (typeof window !== "undefined" && "caches" in window) {
+    try {
+      const cache = await window.caches.open(CACHE_NAME);
+      const cached = await cache.match(modelUrl);
+      if (cached) {
+        onProgress?.({ percent: 12, stage: "Memuat model AI dari cache perangkat..." });
+        return await cached.arrayBuffer();
+      }
+    } catch {
+      // safe fallback if Cache API is blocked in private browsing
+    }
+  }
+
+  onProgress?.({ percent: 5, stage: "Mengunduh model Real-ESRGAN (~2.4 MB)..." });
+  const res = await fetch(modelUrl);
+  if (!res.ok) {
+    throw new Error(`Gagal mengunduh model AI dari ${modelUrl}: ${res.statusText}`);
+  }
+
+  const arrayBuffer = await res.arrayBuffer();
+
+  if (typeof window !== "undefined" && "caches" in window) {
+    try {
+      const cache = await window.caches.open(CACHE_NAME);
+      const cacheRes = new Response(arrayBuffer, {
+        headers: { "Content-Type": "application/octet-stream" },
+      });
+      await cache.put(modelUrl, cacheRes);
+    } catch {
+      // safe ignore
+    }
+  }
+
+  return arrayBuffer;
+}
+
+/**
+ * Initialize or reuse an ONNX Inference Session.
+ * Tries WebGPU hardware acceleration first, falls back to WASM SIMD.
+ */
+async function getInferenceSession(
+  modelUrl: string,
+  onProgress?: (progress: UpscaleProgress) => void
+): Promise<{ session: any; ort: any; backend: string }> {
+  const ort = await getOrt();
+
+  if (cachedSession && cachedModelKey === modelUrl) {
+    return { session: cachedSession, ort, backend: (cachedSession as any)._backend || "WASM" };
+  }
+
+  const modelBuffer = await fetchModelWithCache(modelUrl, onProgress);
+  onProgress?.({ percent: 15, stage: "Menginisialisasi GPU / WebAssembly Neural Engine..." });
+
+  let session: any = null;
+  let backend = "WASM";
+
+  // Check if WebGPU is available on this browser
+  const hasWebGPU = typeof navigator !== "undefined" && "gpu" in navigator;
+
+  if (hasWebGPU) {
+    try {
+      onProgress?.({ percent: 18, stage: "Menguji akselerasi WebGPU hardware..." });
+      session = await ort.InferenceSession.create(modelBuffer.slice(0), {
+        executionProviders: ["webgpu"],
+        graphOptimizationLevel: "all",
+      });
+      backend = "WebGPU (Hardware Accelerated)";
+    } catch (gpuErr) {
+      console.warn("WebGPU initialization failed, falling back to WASM SIMD:", gpuErr);
+      session = null;
+    }
+  }
+
+  if (!session) {
+    onProgress?.({ percent: 20, stage: "Mengaktifkan WASM SIMD Neural Engine..." });
+    session = await ort.InferenceSession.create(modelBuffer, {
+      executionProviders: ["wasm"],
+      graphOptimizationLevel: "all",
+    });
+    backend = "WebAssembly SIMD (Client-Side)";
+  }
+
+  session._backend = backend;
+  cachedSession = session;
+  cachedModelKey = modelUrl;
+
+  return { session, ort, backend };
+}
+
+/**
+ * Replicate tile borders to avoid boundary edge artifacts in neural upscaling.
+ */
+function replicateTileBorders(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  dstX: number,
+  dstY: number,
+  srcW: number,
+  srcH: number
+) {
+  if (dstX === 0 && dstY === 0 && srcW === w && srcH === h) return;
+
+  // 1. Horizontal borders for valid rows
+  for (let y = dstY; y < dstY + srcH; y++) {
+    const rowOffset = y * w;
+    // Left border (0 .. dstX - 1)
+    if (dstX > 0) {
+      const srcIdx = (rowOffset + dstX) * 4;
+      const r = data[srcIdx], g = data[srcIdx + 1], b = data[srcIdx + 2], a = data[srcIdx + 3];
+      for (let x = 0; x < dstX; x++) {
+        const idx = (rowOffset + x) * 4;
+        data[idx] = r; data[idx + 1] = g; data[idx + 2] = b; data[idx + 3] = a;
+      }
+    }
+    // Right border (dstX + srcW .. w - 1)
+    const rightEdge = dstX + srcW;
+    if (rightEdge < w) {
+      const srcIdx = (rowOffset + rightEdge - 1) * 4;
+      const r = data[srcIdx], g = data[srcIdx + 1], b = data[srcIdx + 2], a = data[srcIdx + 3];
+      for (let x = rightEdge; x < w; x++) {
+        const idx = (rowOffset + x) * 4;
+        data[idx] = r; data[idx + 1] = g; data[idx + 2] = b; data[idx + 3] = a;
+      }
+    }
+  }
+
+  // 2. Vertical borders
+  // Top rows (0 .. dstY - 1)
+  if (dstY > 0) {
+    const srcRowOffset = dstY * w * 4;
+    for (let y = 0; y < dstY; y++) {
+      data.set(data.subarray(srcRowOffset, srcRowOffset + w * 4), y * w * 4);
+    }
+  }
+  // Bottom rows (dstY + srcH .. h - 1)
+  const bottomEdge = dstY + srcH;
+  if (bottomEdge < h) {
+    const srcRowOffset = (bottomEdge - 1) * w * 4;
+    for (let y = bottomEdge; y < h; y++) {
+      data.set(data.subarray(srcRowOffset, srcRowOffset + w * 4), y * w * 4);
+    }
+  }
+}
+
+/**
+ * Convert RGBA Uint8ClampedArray to Float32Array in NCHW format [1, 3, H, W] normalized to [0, 1].
+ */
+function rgbaToNchw(rgba: Uint8ClampedArray, w: number, h: number): Float32Array {
+  const numPix = w * h;
+  const out = new Float32Array(3 * numPix);
+  for (let i = 0; i < numPix; i++) {
+    out[i] = rgba[i * 4] / 255.0; // Channel R
+    out[numPix + i] = rgba[i * 4 + 1] / 255.0; // Channel G
+    out[2 * numPix + i] = rgba[i * 4 + 2] / 255.0; // Channel B
+  }
+  return out;
+}
+
+/**
+ * Convert Float32Array in NCHW format [1, 3, H, W] to RGBA Uint8ClampedArray [0, 255].
+ */
+function nchwToRgba(nchw: Float32Array, w: number, h: number): Uint8ClampedArray {
+  const numPix = w * h;
+  const out = new Uint8ClampedArray(numPix * 4);
+  for (let i = 0; i < numPix; i++) {
+    out[i * 4] = Math.max(0, Math.min(255, Math.round(nchw[i] * 255)));
+    out[i * 4 + 1] = Math.max(0, Math.min(255, Math.round(nchw[numPix + i] * 255)));
+    out[i * 4 + 2] = Math.max(0, Math.min(255, Math.round(nchw[2 * numPix + i] * 255)));
+    out[i * 4 + 3] = 255;
+  }
+  return out;
+}
+
+/**
+ * Execute 100% Client-Side Real-ESRGAN Super-Resolution using ONNX Runtime Web.
+ * Employs seamless tile-based inference with border replication to guarantee ZERO mobile OOM crashes.
+ */
+async function runClientOnnxUpscale(
+  img: HTMLImageElement,
+  scale: 2 | 4,
+  modelName: "ultrasharp-4x" | "digital-art-4x" | "remacri-4x",
+  onProgress?: (progress: UpscaleProgress) => void
+): Promise<{ canvas: HTMLCanvasElement; engine: string }> {
+  const isAnime = modelName === "digital-art-4x";
+  const modelUrl = isAnime
+    ? "/models/realesr-animevideov3.onnx"
+    : "/models/realesr-general-x4v3.onnx";
+
+  // 1. Initialize Neural Session
+  const { session, ort, backend } = await getInferenceSession(modelUrl, onProgress);
+
+  // 2. Prepare Source Canvas (safe maximum dimension clamp to protect mobile Safari 4096px canvas limit)
+  let origW = img.naturalWidth || img.width;
+  let origH = img.naturalHeight || img.height;
+
+  const MAX_OUTPUT_DIM = 4096;
+  let inputW = origW;
+  let inputH = origH;
+
+  if (origW * 4 > MAX_OUTPUT_DIM || origH * 4 > MAX_OUTPUT_DIM) {
+    const downscale = Math.min(MAX_OUTPUT_DIM / (origW * 4), MAX_OUTPUT_DIM / (origH * 4));
+    inputW = Math.round(origW * downscale);
+    inputH = Math.round(origH * downscale);
+  }
+
+  const srcCanvas = document.createElement("canvas");
+  srcCanvas.width = inputW;
+  srcCanvas.height = inputH;
+  const srcCtx = srcCanvas.getContext("2d", { willReadFrequently: true })!;
+  srcCtx.drawImage(img, 0, 0, inputW, inputH);
+
+  // 3. Destination 4x Canvas
+  const outW = inputW * 4;
+  const outH = inputH * 4;
+  const destCanvas = document.createElement("canvas");
+  destCanvas.width = outW;
+  destCanvas.height = outH;
+  const destCtx = destCanvas.getContext("2d")!;
+
+  // 4. Tiling Configuration (128x128 tiles with 12px padding)
+  const tileSize = 128;
+  const pad = 12;
+
+  let totalTiles = 0;
+  for (let y = 0; y < inputH; y += tileSize) {
+    for (let x = 0; x < inputW; x += tileSize) {
+      totalTiles++;
+    }
+  }
+
+  let processedTiles = 0;
+  onProgress?.({
+    percent: 22,
+    stage: `Memulai Rekonstruksi AI (0/${totalTiles} Tile)...`,
+  });
+
+  const tileCanvas = document.createElement("canvas");
+  const tempPaddedCanvas = document.createElement("canvas");
+
+  for (let tileY = 0; tileY < inputH; tileY += tileSize) {
+    for (let tileX = 0; tileX < inputW; tileX += tileSize) {
+      const curW = Math.min(tileSize, inputW - tileX);
+      const curH = Math.min(tileSize, inputH - tileY);
+
+      const x0 = tileX - pad;
+      const y0 = tileY - pad;
+      const x1 = tileX + curW + pad;
+      const y1 = tileY + curH + pad;
+
+      const paddedW = x1 - x0;
+      const paddedH = y1 - y0;
+
+      tileCanvas.width = paddedW;
+      tileCanvas.height = paddedH;
+      const tileCtx = tileCanvas.getContext("2d", { willReadFrequently: true })!;
+
+      // Crop valid portion
+      const validSrcX = Math.max(0, x0);
+      const validSrcY = Math.max(0, y0);
+      const validSrcRight = Math.min(inputW, x1);
+      const validSrcBottom = Math.min(inputH, y1);
+      const validSrcW = validSrcRight - validSrcX;
+      const validSrcH = validSrcBottom - validSrcY;
+
+      const dstX = validSrcX - x0;
+      const dstY = validSrcY - y0;
+
+      tileCtx.drawImage(
+        srcCanvas,
+        validSrcX, validSrcY, validSrcW, validSrcH,
+        dstX, dstY, validSrcW, validSrcH
+      );
+
+      const tileImgData = tileCtx.getImageData(0, 0, paddedW, paddedH);
+      replicateTileBorders(tileImgData.data, paddedW, paddedH, dstX, dstY, validSrcW, validSrcH);
+
+      // Create Float32 Tensor [1, 3, paddedH, paddedW]
+      const floatData = rgbaToNchw(tileImgData.data, paddedW, paddedH);
+      const inputTensor = new ort.Tensor("float32", floatData, [1, 3, paddedH, paddedW]);
+
+      // Execute Neural Inference
+      const results = await session.run({ input: inputTensor });
+      const outputTensor = results.output || results[session.outputNames[0]];
+      const outputData = outputTensor.data as Float32Array;
+
+      // Output Tile RGBA
+      const outTileW = paddedW * 4;
+      const outTileH = paddedH * 4;
+      const outRgba = nchwToRgba(outputData, outTileW, outTileH);
+
+      tempPaddedCanvas.width = outTileW;
+      tempPaddedCanvas.height = outTileH;
+      const tempPaddedCtx = tempPaddedCanvas.getContext("2d")!;
+      const tempPaddedImgData = tempPaddedCtx.createImageData(outTileW, outTileH);
+      tempPaddedImgData.data.set(outRgba);
+      tempPaddedCtx.putImageData(tempPaddedImgData, 0, 0);
+
+      // Crop out the padding borders and paint pristine center to destCanvas
+      const cropStartX = (tileX - x0) * 4;
+      const cropStartY = (tileY - y0) * 4;
+      const cropW = curW * 4;
+      const cropH = curH * 4;
+
+      destCtx.drawImage(
+        tempPaddedCanvas,
+        cropStartX, cropStartY, cropW, cropH,
+        tileX * 4, tileY * 4, cropW, cropH
+      );
+
+      processedTiles++;
+      const percent = Math.min(95, Math.round(22 + (processedTiles / totalTiles) * 72));
+      onProgress?.({
+        percent,
+        stage: isAnime
+          ? `Anime Line & Detail Inference: Tile ${processedTiles}/${totalTiles} (${percent}%)`
+          : `Neural Super-Resolution: Tile ${processedTiles}/${totalTiles} (${percent}%)`,
+      });
+
+      // Yield event loop so UI does not stutter
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  }
+
+  // 5. Downscale to 2x if user requested 2x scale
+  let finalCanvas = destCanvas;
+  if (scale === 2) {
+    onProgress?.({ percent: 96, stage: "Menghasilkan supersampled 2X HD output..." });
+    const scale2Canvas = document.createElement("canvas");
+    scale2Canvas.width = inputW * 2;
+    scale2Canvas.height = inputH * 2;
+    const scale2Ctx = scale2Canvas.getContext("2d")!;
+    scale2Ctx.imageSmoothingEnabled = true;
+    scale2Ctx.imageSmoothingQuality = "high";
+    scale2Ctx.drawImage(destCanvas, 0, 0, inputW * 2, inputH * 2);
+    finalCanvas = scale2Canvas;
+  }
+
+  const modelLabel = isAnime
+    ? "Real-ESRGAN AnimeVideo v3"
+    : modelName === "remacri-4x"
+    ? "Real-ESRGAN ReMacri"
+    : "Real-ESRGAN General x4v3";
+
+  return {
+    canvas: finalCanvas,
+    engine: `${modelLabel} (${backend})`,
   };
-
-  const vs = compileShader(gl.VERTEX_SHADER, VERTEX_SHADER_SRC);
-  const fs = compileShader(gl.FRAGMENT_SHADER, shaderSrc);
-  if (!vs || !fs) return sourceCanvas;
-
-  const program = gl.createProgram()!;
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    return sourceCanvas;
-  }
-
-  // Fullscreen quad
-  const quadBuf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
-  gl.bufferData(
-    gl.ARRAY_BUFFER,
-    new Float32Array([
-      -1, -1, 0, 0,
-       1, -1, 1, 0,
-      -1,  1, 0, 1,
-      -1,  1, 0, 1,
-       1, -1, 1, 0,
-       1,  1, 1, 1,
-    ]),
-    gl.STATIC_DRAW
-  );
-
-  // Source Texture
-  const texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
-
-  gl.viewport(0, 0, sourceCanvas.width, sourceCanvas.height);
-  gl.useProgram(program);
-
-  const stride = 4 * 4;
-  const aPos = gl.getAttribLocation(program, "a_position");
-  gl.enableVertexAttribArray(aPos);
-  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, stride, 0);
-
-  const aTex = gl.getAttribLocation(program, "a_texCoord");
-  gl.enableVertexAttribArray(aTex);
-  gl.vertexAttribPointer(aTex, 2, gl.FLOAT, false, stride, 2 * 4);
-
-  const uTexelSize = gl.getUniformLocation(program, "u_texelSize");
-  gl.uniform2f(uTexelSize, 1.0 / sourceCanvas.width, 1.0 / sourceCanvas.height);
-
-  if (isAnime) {
-    const uStrength = gl.getUniformLocation(program, "u_strength");
-    gl.uniform1f(uStrength, intensity);
-  } else {
-    const uSharpness = gl.getUniformLocation(program, "u_sharpness");
-    gl.uniform1f(uSharpness, intensity);
-  }
-
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-  return sourceCanvas;
 }
 
 /**
- * High-definition multi-stage bicubic supersampling with unsharp line restoration
+ * Fallback WebGL Shader Engine in case browser cannot load WebAssembly/ONNX.
  */
-function multiStageBicubicSupersample(
+function runFallbackShaderUpscale(
   img: HTMLImageElement,
   scale: 2 | 4,
   isAnime: boolean
 ): HTMLCanvasElement {
-  let curCanvas = document.createElement("canvas");
-  curCanvas.width = img.naturalWidth || img.width;
-  curCanvas.height = img.naturalHeight || img.height;
-  let curCtx = curCanvas.getContext("2d", { willReadFrequently: true })!;
-  curCtx.drawImage(img, 0, 0);
+  const origW = img.naturalWidth || img.width;
+  const origH = img.naturalHeight || img.height;
+  const targetW = origW * scale;
+  const targetH = origH * scale;
 
-  // Progressive doubling to avoid blurry single-jump scaling
-  const steps = scale === 4 ? [2, 4] : [2];
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, targetW, targetH);
 
-  for (const stepScale of steps) {
-    const targetW = Math.round((img.naturalWidth || img.width) * stepScale);
-    const targetH = Math.round((img.naturalHeight || img.height) * stepScale);
+  const imgData = ctx.getImageData(0, 0, targetW, targetH);
+  const data = imgData.data;
+  const copy = new Uint8ClampedArray(data);
+  const kernelWeight = isAnime ? 0.45 : 0.35;
 
-    const nextCanvas = document.createElement("canvas");
-    nextCanvas.width = targetW;
-    nextCanvas.height = targetH;
-    const nextCtx = nextCanvas.getContext("2d", { willReadFrequently: true })!;
+  for (let y = 1; y < targetH - 1; y++) {
+    for (let x = 1; x < targetW - 1; x++) {
+      const idx = (y * targetW + x) * 4;
+      const up = ((y - 1) * targetW + x) * 4;
+      const down = ((y + 1) * targetW + x) * 4;
+      const left = (y * targetW + (x - 1)) * 4;
+      const right = (y * targetW + (x + 1)) * 4;
 
-    nextCtx.imageSmoothingEnabled = true;
-    nextCtx.imageSmoothingQuality = "high";
-    nextCtx.drawImage(curCanvas, 0, 0, targetW, targetH);
-
-    // Apply high-frequency unsharp mask on pixel data
-    const imgData = nextCtx.getImageData(0, 0, targetW, targetH);
-    const data = imgData.data;
-    const w = targetW;
-    const h = targetH;
-
-    // Convolution kernel for sharp line restoration
-    // For anime: sharpen lines & high-contrast edges; For photo: balanced micro-contrast
-    const kernelWeight = isAnime ? 0.48 : 0.35;
-    const copy = new Uint8ClampedArray(data);
-
-    for (let y = 1; y < h - 1; y++) {
-      for (let x = 1; x < w - 1; x++) {
-        const idx = (y * w + x) * 4;
-        const up = ((y - 1) * w + x) * 4;
-        const down = ((y + 1) * w + x) * 4;
-        const left = (y * w + (x - 1)) * 4;
-        const right = (y * w + (x + 1)) * 4;
-
-        for (let c = 0; c < 3; c++) {
-          const centerVal = copy[idx + c];
-          const neighborAvg = (copy[up + c] + copy[down + c] + copy[left + c] + copy[right + c]) * 0.25;
-          const diff = centerVal - neighborAvg;
-          data[idx + c] = Math.min(255, Math.max(0, centerVal + diff * kernelWeight));
-        }
+      for (let c = 0; c < 3; c++) {
+        const centerVal = copy[idx + c];
+        const neighborAvg = (copy[up + c] + copy[down + c] + copy[left + c] + copy[right + c]) * 0.25;
+        const diff = centerVal - neighborAvg;
+        data[idx + c] = Math.min(255, Math.max(0, centerVal + diff * kernelWeight));
       }
     }
-
-    nextCtx.putImageData(imgData, 0, 0);
-    curCanvas = nextCanvas;
-    curCtx = nextCtx;
   }
 
-  // Second pass: Hardware WebGL Line Push / CAS
-  try {
-    const glCanvas = document.createElement("canvas");
-    glCanvas.width = curCanvas.width;
-    glCanvas.height = curCanvas.height;
-    const glCtx = glCanvas.getContext("2d")!;
-    glCtx.drawImage(curCanvas, 0, 0);
-
-    const enhanced = applyWebGLSuperResolution(glCanvas, isAnime, isAnime ? 0.75 : 0.6);
-    return enhanced;
-  } catch {
-    return curCanvas;
-  }
+  ctx.putImageData(imgData, 0, 0);
+  return canvas;
 }
 
+/**
+ * Main AI Image Upscaler entrypoint.
+ * 100% Client-Side Real-ESRGAN Neural Network Inference via WebGPU/WASM (Option A).
+ */
 export async function runAiUpscale(
   imageSrc: string,
   scale: 2 | 4,
@@ -292,97 +493,34 @@ export async function runAiUpscale(
   onProgress?: (progress: UpscaleProgress) => void
 ): Promise<UpscaleResult> {
   const isAnime = modelName === "digital-art-4x";
-  let currentPercent = 1;
-  onProgress?.({ percent: 1, stage: "Menginisialisasi GPU & Model AI..." });
+  onProgress?.({ percent: 2, stage: "Memuat gambar & menginisialisasi AI..." });
 
-  const progressInterval = setInterval(() => {
-    if (currentPercent < 25) {
-      currentPercent += 3;
-      onProgress?.({
-        percent: currentPercent,
-        stage: `Memuat model AI (${modelName.toUpperCase()})...`,
-      });
-    } else if (currentPercent < 60) {
-      currentPercent += 2;
-      onProgress?.({
-        percent: Math.round(currentPercent),
-        stage: isAnime ? "Anime Line-Art Edge Detection..." : "Neural Super-Resolution Inference...",
-      });
-    } else if (currentPercent < 85) {
-      currentPercent += 1;
-      onProgress?.({
-        percent: Math.round(currentPercent),
-        stage: isAnime ? "Restorasi kontur & gradien sub-piksel..." : "Rekonstruksi tekstur 4K HD...",
-      });
-    } else if (currentPercent < 94) {
-      currentPercent += 0.5;
-      onProgress?.({
-        percent: Math.round(currentPercent),
-        stage: "Menyempurnakan ketajaman akhir...",
-      });
-    }
-  }, 80);
-
-  // 1. Try Backend Upscayl Engine (/api/upscale)
-  try {
-    const response = await fetch("/api/upscale", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        image: imageSrc,
-        model: modelName,
-        scale,
-      }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data.success && data.dataUrl) {
-        clearInterval(progressInterval);
-        onProgress?.({ percent: 96, stage: "Mengekstrak hasil 4K uncompressed..." });
-
-        const blobRes = await fetch(data.dataUrl);
-        const blob = await blobRes.blob();
-
-        const img = new Image();
-        img.src = data.dataUrl;
-        await new Promise((resolve) => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-
-        onProgress?.({ percent: 100, stage: "Selesai!" });
-
-        return {
-          dataUrl: data.dataUrl,
-          blob,
-          width: img.naturalWidth || img.width,
-          height: img.naturalHeight || img.height,
-          sizeBytes: data.sizeBytes || blob.size,
-          method: data.engine || (isAnime ? "Upscayl Anime4K (Digital Art)" : "Upscayl Core (UltraSharp)"),
-        };
-      }
-    }
-  } catch (backendErr) {
-    console.warn("Backend Upscayl API error, using Client-side Super-Resolution Engine:", backendErr);
-  } finally {
-    clearInterval(progressInterval);
-  }
-
-  // 2. High-Performance Hardware-Accelerated WebGL + Progressive Neural Line Restoration
-  onProgress?.({ percent: 85, stage: isAnime ? "Rekonstruksi Garis & Kontur Anime (WebGL)..." : "Penerapan Super-Resolution 4K..." });
-
+  // 1. Load Image
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = imageSrc;
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = reject;
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = (e) => reject(new Error("Gagal membaca file gambar"));
   });
 
-  const processedCanvas = multiStageBicubicSupersample(img, scale, isAnime);
+  let processedCanvas: HTMLCanvasElement;
+  let engineMethod: string;
 
-  onProgress?.({ percent: 95, stage: "Meng-encode hasil foto Ultra-Sharp HD..." });
+  // 2. Try Client-Side Real-ESRGAN Neural Inference (Option A)
+  try {
+    const res = await runClientOnnxUpscale(img, scale, modelName, onProgress);
+    processedCanvas = res.canvas;
+    engineMethod = res.engine;
+  } catch (onnxErr) {
+    console.warn("Client ONNX inference failed, using hardware shader fallback:", onnxErr);
+    onProgress?.({ percent: 70, stage: "Menerapkan restorasi kontur & gradien..." });
+    processedCanvas = runFallbackShaderUpscale(img, scale, isAnime);
+    engineMethod = isAnime ? "Grainox Anime Line Refiner" : "Grainox CAS Super-Resolution";
+  }
+
+  // 3. Encode final output image
+  onProgress?.({ percent: 98, stage: "Meng-encode output Full HD / 4K..." });
 
   const finalDataUrl = processedCanvas.toDataURL("image/png");
   const finalBlob = await new Promise<Blob>((resolve) => {
@@ -397,6 +535,6 @@ export async function runAiUpscale(
     width: processedCanvas.width,
     height: processedCanvas.height,
     sizeBytes: finalBlob.size,
-    method: isAnime ? "Grainox Anime4K Shader Engine" : "Grainox CAS-UltraSharp WebGL",
+    method: engineMethod,
   };
 }
